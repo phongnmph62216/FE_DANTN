@@ -1,7 +1,14 @@
 import axios from 'axios'
 
+function resolveBaseURL() {
+  const fromEnv = import.meta.env.VITE_API_BASE_URL?.trim()
+  if (fromEnv) return fromEnv
+  if (import.meta.env.DEV) return 'http://localhost:8080'
+  return ''
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '',
+  baseURL: resolveBaseURL(),
   timeout: 15000,
 })
 
