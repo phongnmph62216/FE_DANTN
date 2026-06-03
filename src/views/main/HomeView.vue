@@ -1,7 +1,7 @@
 <template>
   <div class="max-w-7xl mx-auto space-y-8">
     <div class="bg-white p-8 rounded-2xl border border-surface-container shadow-sm">
-      <h1 class="text-3xl font-bold text-[#0D2533] mb-4">Chào mừng đến với SevenStrike Admin Console</h1>
+      <h1 class="text-3xl font-bold text-[#0D2533] mb-4">Chào mừng đến với Bee Stylish Admin Console</h1>
       <p class="text-gray-600 mb-6">
         Hệ thống quản lý thời trang Bee Stylish. Vui lòng chọn chức năng trên thanh điều hướng bên trái hoặc nhấn vào nút bên dưới để truy cập danh sách sản phẩm.
       </p>

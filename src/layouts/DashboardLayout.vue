@@ -370,7 +370,7 @@ const isActiveRoute = (path) => {
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuDB9BDjKZNGg7RYSTuluq9Bm2i8A09TR7KVgMbJ8E7SNh6ICgs9ruWENb93tFQ3kPuF0Ktc8pNCkhtzE6XkUtprrh2eb7Ew-2MN6bjHGKh2VCn93eKLDX1ctOjv4BLKQncfirKP374z70_kaaU7xaQ62XzMrkZQ0V52AWquSIMaxCwn5XiQhQqqZxdWpAARchrxYUZdVtNW1FC8Sh9alRiaTX75eDJ7vHJ_u2Yhs8LwOPauLSj9thFrq23Tn-Sgz73P92iYxOcOl64"
             />
             <div class="flex flex-col items-start">
-              <span class="font-label-sm text-on-surface leading-tight">Nguyễn Hoàng Admin</span>
+              <span class="font-label-sm text-on-surface leading-tight">Nguyễn Minh Phong</span>
             </div>
             <span class="material-symbols-outlined text-on-surface-variant text-[20px]">keyboard_arrow_down</span>
           </div>
