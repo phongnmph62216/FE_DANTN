@@ -195,7 +195,7 @@ const fetchVariants = async (page = 0) => {
         id: item.id,
         productCode: item.maSanPham || 'N/A',
         variantCode: item.maChiTietSanPham || item.ma || 'N/A',
-        size: sanitizeVietnamese(item.tenKichThuoc || ''),
+        size: sanitizeVietnamese(item.tenKichCo || item.tenKichThuoc || ''),
         color: sanitizeVietnamese(item.tenMauSac || ''),
         stock: item.soLuongTon ?? 0,
         importPrice: item.giaNhap ?? 0,
