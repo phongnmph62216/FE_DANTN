@@ -20,8 +20,30 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
+/**
+ * Helper to check if a response is wrapped in the backend's ResponseObject envelope.
+ * Backend returns { status: "200 OK", message: "...", data: {...} }
+ * We unwrap it so consumers get `response.data` = the actual payload.
+ */
+const isResponseObject = (data) => {
+  return data && typeof data === 'object' && 'status' in data && 'data' in data && 'message' in data
+}
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Auto-unwrap ResponseObject wrapper from backend
+    if (isResponseObject(response.data)) {
+      const wrapper = response.data
+      // Preserve the wrapper info as metadata
+      response._wrapper = {
+        status: wrapper.status,
+        message: wrapper.message,
+      }
+      // Replace response.data with the actual data payload
+      response.data = wrapper.data
+    }
+    return response
+  },
   (error) => {
     // TODO: handle auth refresh and global errors here
     return Promise.reject(error)
@@ -29,3 +51,4 @@ api.interceptors.response.use(
 )
 
 export default api
+

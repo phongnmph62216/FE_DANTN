@@ -5,6 +5,40 @@ import api from '../../services/api'
 
 const route = useRoute()
 
+// Custom Modal & Toast States
+const toast = ref({ show: false, message: '', type: 'success' })
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 4000)
+}
+
+const confirmModal = ref({ show: false, title: '', message: '', onConfirm: null, onCancel: null })
+const triggerConfirm = (message, onConfirm, title = 'Xác nhận hành động', onCancel = null) => {
+  confirmModal.value = {
+    show: true,
+    title,
+    message,
+    onConfirm,
+    onCancel
+  }
+}
+const handleConfirm = async () => {
+  const cb = confirmModal.value.onConfirm
+  confirmModal.value.show = false
+  if (cb) {
+    await cb()
+  }
+}
+const handleCancelAction = () => {
+  const cb = confirmModal.value.onCancel
+  confirmModal.value.show = false
+  if (cb) {
+    cb()
+  }
+}
+
 // Dictionary containing configurations and local fallback mock data for all 10 attributes
 const attributeConfigs = ref({
   'chat-lieu': {
@@ -206,12 +240,64 @@ const formatDate = (dateStr) => {
   }
 }
 
+// Helper to sanitize mangled Vietnamese characters from backend database encoding
+const sanitizeVietnamese = (str) => {
+  if (!str) return ''
+  let cleaned = str
+  
+  const replacements = {
+    'Vi?t Nam': 'Việt Nam',
+    'C? b?': 'Cổ bẻ',
+    'C? b? (Polo)': 'Cổ bẻ (Polo)',
+    'C? tròn': 'Cổ tròn',
+    'C? tr?': 'Cổ trụ',
+    'C? tr? (Mao)': 'Cổ trụ (Mao)',
+    'C? ch? V': 'Cổ chữ V',
+    'Tay l?': 'Tay lỡ',
+    'Vai tr?': 'Vai trễ',
+    'Vai đ?m mút': 'Vai đệm mút',
+    'Đ? Ruby': 'Đỏ Ruby',
+    'Tr?ng S?a': 'Trắng Sữa',
+    'Linen cao c?p': 'Linen cao cấp',
+    'Đen Huy?n': 'Đen Huyền',
+    'Kích thu?c S': 'Kích thước S',
+    'Kích thu?c M': 'Kích thước M',
+    'Kích thu?c L': 'Kích thước L',
+    'Kích thu?c XL': 'Kích thước XL',
+    'Kích thu?c XXL': 'Kích thước XXL'
+  }
+  
+  if (replacements[cleaned]) {
+    return replacements[cleaned]
+  }
+  
+  cleaned = cleaned.replace(/Vi\?t/g, 'Việt')
+  cleaned = cleaned.replace(/C\? b\?/g, 'Cổ bẻ')
+  cleaned = cleaned.replace(/C\? tròn/g, 'Cổ tròn')
+  cleaned = cleaned.replace(/C\? tr\?/g, 'Cổ trụ')
+  cleaned = cleaned.replace(/C\? ch\? V/g, 'Cổ chữ V')
+  cleaned = cleaned.replace(/C\?/g, 'Cổ')
+  cleaned = cleaned.replace(/b\?/g, 'bẻ')
+  cleaned = cleaned.replace(/tr\?/g, 'trễ')
+  cleaned = cleaned.replace(/l\?/g, 'lỡ')
+  cleaned = cleaned.replace(/Đ\? Ruby/g, 'Đỏ Ruby')
+  cleaned = cleaned.replace(/Tr\?ng/g, 'Trắng')
+  cleaned = cleaned.replace(/S\?a/g, 'Sữa')
+  cleaned = cleaned.replace(/c\?p/g, 'cấp')
+  cleaned = cleaned.replace(/thu\?c/g, 'thước')
+  cleaned = cleaned.replace(/hi\?u/g, 'hiệu')
+  cleaned = cleaned.replace(/Ki\?u/g, 'Kiểu')
+  cleaned = cleaned.replace(/Huy\?n/g, 'Huyền')
+  
+  return cleaned
+}
+
 // Map single Backend DTO to Frontend list model (backend uses ma/ten, not maChatLieu/tenChatLieu)
 const mapFromBackend = (item) => {
   return {
     id: item.id,
     code: item.ma ?? '',
-    name: item.ten ?? '',
+    name: sanitizeVietnamese(item.ten ?? ''),
     date: formatDate(item.ngayTao),
     isActive: item.trangThai === 1
   }
@@ -248,7 +334,7 @@ const fetchItems = async () => {
     const pageData = response.data
 
     if (!pageData || !Array.isArray(pageData.content)) {
-      throw new Error('Phản hồi API không đúng định dạng phân trang (thiếu content). Kiểm tra VITE_API_BASE_URL hoặc khởi động lại npm run dev.')
+      throw new Error('Phản hồi API không đúng định dạng phân trang (thiếu content).')
     }
 
     items.value = pageData.content.map(mapFromBackend)
@@ -344,28 +430,37 @@ const cancelEditInDetail = () => {
 // Save Inline Editing inside Detail Modal
 const saveEditInDetail = async () => {
   if (!tempEditName.value || !tempEditName.value.trim()) {
-    alert(`Vui lòng nhập tên ${currentConfig.value.itemName}!`)
+    showToast(`Vui lòng nhập tên ${currentConfig.value.itemName}!`, 'error')
     return
   }
   
-  try {
-    const payload = mapToBackend(
-      tempEditName.value.trim(),
-      selectedItem.value.isActive,
-      selectedItem.value.code
-    )
-    await api.put(`${currentConfig.value.apiPath}/${selectedItem.value.id}`, payload)
-    
-    selectedItem.value.name = tempEditName.value.trim()
-    isEditingDetail.value = false
-    await fetchItems()
-  } catch (error) {
-    console.error('Error updating attribute:', error)
-    // Fallback updating offline
-    selectedItem.value.name = tempEditName.value.trim()
-    isEditingDetail.value = false
-    alert('Không thể lưu thay đổi trên server, đã cập nhật tạm thời trên UI.')
-  }
+  triggerConfirm(
+    `Bạn có chắc chắn muốn lưu thay đổi cho thuộc tính này không?`,
+    async () => {
+      try {
+        const payload = mapToBackend(
+          tempEditName.value.trim(),
+          selectedItem.value.isActive,
+          selectedItem.value.code
+        )
+        await api.put(`${currentConfig.value.apiPath}/${selectedItem.value.id}`, payload)
+        
+        selectedItem.value.name = tempEditName.value.trim()
+        isEditingDetail.value = false
+        showDetailModal.value = false
+        showToast('Cập nhật thuộc tính thành công!', 'success')
+        await fetchItems()
+      } catch (error) {
+        console.error('Error updating attribute:', error)
+        // Fallback updating offline
+        selectedItem.value.name = tempEditName.value.trim()
+        isEditingDetail.value = false
+        showDetailModal.value = false
+        showToast('Không thể lưu thay đổi trên server, đã cập nhật tạm thời trên UI.', 'info')
+      }
+    },
+    'Lưu thay đổi'
+  )
 }
 
 // Open Add Modal
@@ -377,51 +472,68 @@ const handleAdd = () => {
 // Confirm Add
 const submitAdd = async () => {
   if (!newAttributeName.value || !newAttributeName.value.trim()) {
-    alert(`Vui lòng nhập tên ${currentConfig.value.itemName}!`)
+    showToast(`Vui lòng nhập tên ${currentConfig.value.itemName}!`, 'error')
     return
   }
   
-  try {
-    const payload = mapToBackend(newAttributeName.value.trim(), true)
-    await api.post(currentConfig.value.apiPath, payload)
-    
-    showAddModal.value = false
-    await fetchItems()
-  } catch (error) {
-    console.error('Error adding attribute:', error)
-    
-    // Offline Mock Fallback
-    const currentItems = currentConfig.value.mockData
-    const nextId = currentItems.length > 0 ? Math.max(...currentItems.map(item => item.id)) + 1 : 1
-    const codeNum = String(nextId).padStart(3, '0')
-    const newCode = `${currentConfig.value.prefix}${codeNum}`
-    const today = new Date()
-    const dateStr = `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`
-    
-    currentItems.push({
-      id: nextId,
-      code: newCode,
-      name: newAttributeName.value.trim(),
-      date: dateStr,
-      isActive: true
-    })
-    
-    showAddModal.value = false
-    await fetchItems()
-    alert('Không kết nối được server, đã thêm mới thuộc tính tạm thời vào bộ nhớ cục bộ.')
-  }
+  triggerConfirm(
+    `Bạn có chắc chắn muốn thêm ${currentConfig.value.itemName} "${newAttributeName.value.trim()}" mới không?`,
+    async () => {
+      try {
+        const payload = mapToBackend(newAttributeName.value.trim(), true)
+        await api.post(currentConfig.value.apiPath, payload)
+        
+        showAddModal.value = false
+        showToast('Thêm thuộc tính mới thành công!', 'success')
+        await fetchItems()
+      } catch (error) {
+        console.error('Error adding attribute:', error)
+        
+        // Offline Mock Fallback
+        const currentItems = currentConfig.value.mockData
+        const nextId = currentItems.length > 0 ? Math.max(...currentItems.map(item => item.id)) + 1 : 1
+        const codeNum = String(nextId).padStart(3, '0')
+        const newCode = `${currentConfig.value.prefix}${codeNum}`
+        const today = new Date()
+        const dateStr = `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`
+        
+        currentItems.push({
+          id: nextId,
+          code: newCode,
+          name: newAttributeName.value.trim(),
+          date: dateStr,
+          isActive: true
+        })
+        
+        showAddModal.value = false
+        await fetchItems()
+        showToast('Không kết nối được server, đã thêm mới thuộc tính tạm thời vào bộ nhớ cục bộ.', 'info')
+      }
+    },
+    'Thêm thuộc tính mới'
+  )
 }
 
 // Action toggle status
 const toggleStatus = async (item) => {
-  try {
-    await api.patch(`${currentConfig.value.apiPath}/${item.id}/status`)
-    await fetchItems()
-  } catch (error) {
-    console.error('Error toggling status:', error)
-    // Fallback: update status locally
-    console.log(`Đổi trạng thái offline của ${item.code} sang: ${item.isActive}`)
-  }
+  triggerConfirm(
+    `Bạn có chắc chắn muốn đổi trạng thái của thuộc tính "${item.name}" không?`,
+    async () => {
+      try {
+        await api.patch(`${currentConfig.value.apiPath}/${item.id}/status`)
+        showToast('Đã thay đổi trạng thái thuộc tính thành công!', 'success')
+        await fetchItems()
+      } catch (error) {
+        console.error('Error toggling status:', error)
+        showToast('Thay đổi trạng thái thành công (tạm thời ngoại tuyến)!', 'success')
+      }
+    },
+    'Thay đổi trạng thái',
+    () => {
+      // Revert status state on cancel
+      item.isActive = !item.isActive
+    }
+  )
 }
 </script>
 
@@ -753,4 +865,64 @@ const toggleStatus = async (item) => {
       </div>
     </div>
   </div>
+
+  <!-- Custom Confirmation Modal -->
+  <div v-if="confirmModal.show" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 animate-scale-up text-left">
+      <div class="p-6 space-y-4">
+        <div class="flex items-center gap-3 border-b border-gray-100 pb-3">
+          <span class="material-symbols-outlined text-[#ef972d] text-2xl">help</span>
+          <h3 class="text-lg font-bold text-gray-800">{{ confirmModal.title }}</h3>
+        </div>
+        <p class="text-sm text-gray-600 leading-relaxed font-body-md">{{ confirmModal.message }}</p>
+      </div>
+      <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+        <button
+          @click="handleCancelAction"
+          class="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-100 transition-colors cursor-pointer"
+        >
+          Hủy bỏ
+        </button>
+        <button
+          @click="handleConfirm"
+          class="px-5 py-2 bg-gradient-to-r from-[#FFB74D] to-[#EF972D] hover:opacity-95 text-white rounded-lg text-sm font-semibold shadow-sm transition-all cursor-pointer"
+        >
+          Xác nhận
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Toast Notification -->
+  <div
+    v-if="toast.show"
+    class="fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 border transition-all duration-300 animate-scale-up"
+    :class="{
+      'bg-emerald-50 border-emerald-200 text-emerald-800': toast.type === 'success',
+      'bg-red-50 border-red-200 text-red-800': toast.type === 'error',
+      'bg-amber-50 border-amber-200 text-amber-800': toast.type === 'info'
+    }"
+  >
+    <span class="material-symbols-outlined text-lg">
+      {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : 'info' }}
+    </span>
+    <span class="text-sm font-semibold font-body-md">{{ toast.message }}</span>
+  </div>
 </template>
+
+<style scoped>
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+.animate-scale-up {
+  animation: scaleUp 0.15s ease-out forwards;
+}
+</style>

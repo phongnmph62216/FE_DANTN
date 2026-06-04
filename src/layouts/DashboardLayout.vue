@@ -141,7 +141,13 @@ const isActiveRoute = (path) => {
             >
               Danh sách sản phẩm
             </RouterLink>
-            <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Biến thể sản phẩm</a>
+            <RouterLink
+              to="/products/variants"
+              class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+              :class="isActiveRoute('/products/variants') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+            >
+              Biến thể sản phẩm
+            </RouterLink>
           </div>
         </li>
 
