@@ -162,12 +162,34 @@ const loadFilterOptions = async () => {
   }
 }
 
+const productStatusMap = ref({})
+
+const fetchProductStatuses = async () => {
+  try {
+    const res = await api.get('/api/v1/san-pham', { params: { size: 1000 } })
+    if (res.data && res.data.content) {
+      const statuses = {}
+      res.data.content.forEach(p => {
+        statuses[p.maSanPham] = p.trangThai === 1
+      })
+      productStatusMap.value = statuses
+    }
+  } catch (err) {
+    console.warn('Failed to fetch product statuses:', err)
+  }
+}
+
+const isParentProductInactive = (productCode) => {
+  return productStatusMap.value[productCode] === false
+}
+
 // Main API fetcher for variants list
 const fetchVariants = async (page = 0) => {
   isLoading.value = true
   currentPage.value = page
   selectedVariantIds.value = [] // Clear selection when fetching new dataset
   try {
+    await fetchProductStatuses()
     const params = {
       page: page,
       size: pageSize.value,
@@ -200,7 +222,7 @@ const fetchVariants = async (page = 0) => {
         stock: item.soLuongTon ?? 0,
         importPrice: item.giaNhap ?? 0,
         salePrice: item.giaBan ?? 0,
-        isActive: item.trangThai === 1,
+        isActive: (item.soLuongTon ?? 0) === 0 ? false : (isParentProductInactive(item.maSanPham) ? false : (item.trangThai === 1)),
         image: formatImage(item.anh),
       }))
       totalPages.value = data.totalPages || 1
@@ -231,12 +253,41 @@ const fetchVariants = async (page = 0) => {
   }
 }
 
-const handleToggle = async (variant) => {
-  try {
-    await api.patch(`/api/v1/chi-tiet-san-pham/${variant.id}/status`)
-  } catch (err) {
-    console.warn('Backend patch status failed, keeping toggle change:', err)
+const handleToggle = (variant) => {
+  const newState = variant.isActive
+  const oldState = !variant.isActive
+  
+  // Revert toggle visually until confirmed
+  variant.isActive = oldState
+
+  if (newState && variant.stock === 0) {
+    showToast('Không thể mở bán biến thể có tồn kho bằng 0!', 'error')
+    return
   }
+
+  if (newState && isParentProductInactive(variant.productCode)) {
+    showToast('Không thể mở bán biến thể khi sản phẩm ngừng bán!', 'error')
+    return
+  }
+
+  triggerConfirm(
+    `Bạn có chắc chắn muốn ${newState ? 'mở bán lại' : 'ngừng bán'} biến thể "${variant.variantCode}" không?`,
+    async () => {
+      try {
+        const res = await api.patch(`/api/v1/chi-tiet-san-pham/${variant.id}/status`)
+        if (res._wrapper && res._wrapper.status && res._wrapper.status.includes('ERROR')) {
+          showToast(`Đổi trạng thái thất bại: ${res._wrapper.message}`, 'error')
+        } else {
+          showToast(`Đã thay đổi trạng thái biến thể sang ${newState ? 'Đang bán' : 'Ngừng bán'} thành công!`, 'success')
+          await fetchVariants(currentPage.value)
+        }
+      } catch (err) {
+        console.warn('Backend patch status failed:', err)
+        showToast('Thay đổi trạng thái thất bại, vui lòng thử lại sau!', 'error')
+      }
+    },
+    'Thay đổi trạng thái biến thể'
+  )
 }
 
 const showQrModal = ref(false)
@@ -470,7 +521,7 @@ const openDetailsModal = async (variant) => {
         stock: data.soLuongTon ?? 0,
         importPrice: data.giaNhap ?? 0,
         salePrice: data.giaBan ?? 0,
-        isActive: data.trangThai === 1,
+        isActive: isParentProductInactive(data.maSanPham) ? false : (data.trangThai === 1),
         image: data.anh || '',
         description: ''
       }
@@ -589,6 +640,12 @@ const updateVariantDetail = async () => {
 // Watch filters and refetch
 watch([searchQuery, selectedColor, selectedSize, selectedStatus], () => {
   fetchVariants(0)
+})
+
+watch(() => editForm.value.stock, (newStock) => {
+  if (newStock === 0) {
+    editForm.value.isActive = false
+  }
 })
 
 onMounted(() => {
@@ -823,11 +880,16 @@ onMounted(() => {
                   >
                     <span class="material-symbols-outlined text-[20px]">visibility</span>
                   </button>
-                  <label class="relative inline-flex items-center cursor-pointer" title="Đổi trạng thái">
+                  <label 
+                    class="relative inline-flex items-center" 
+                    :class="(variant.stock === 0 || isParentProductInactive(variant.productCode)) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'"
+                    :title="variant.stock === 0 ? 'Không thể mở bán khi tồn kho bằng 0' : (isParentProductInactive(variant.productCode) ? 'Không thể mở bán khi sản phẩm ngừng bán' : 'Đổi trạng thái')"
+                  >
                     <input
                       v-model="variant.isActive"
                       type="checkbox"
                       class="sr-only peer"
+                      :disabled="variant.stock === 0 || isParentProductInactive(variant.productCode)"
                       @change="handleToggle(variant)"
                     />
                     <div
@@ -962,11 +1024,16 @@ onMounted(() => {
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-2">Trạng thái kinh doanh</label>
               <div class="flex items-center gap-3">
-                <label class="relative inline-flex items-center cursor-pointer">
+                <label 
+                  class="relative inline-flex items-center"
+                  :class="(editForm.stock === 0 || isParentProductInactive(editForm.productCode)) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'"
+                  :title="editForm.stock === 0 ? 'Không thể mở bán khi tồn kho bằng 0' : (isParentProductInactive(editForm.productCode) ? 'Không thể mở bán khi sản phẩm ngừng bán' : 'Đổi trạng thái')"
+                >
                   <input
                     v-model="editForm.isActive"
                     type="checkbox"
                     class="sr-only peer"
+                    :disabled="editForm.stock === 0 || isParentProductInactive(editForm.productCode)"
                   />
                   <div
                     class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#ef972d]"

@@ -427,10 +427,144 @@ const cancelEditInDetail = () => {
   isEditingDetail.value = false
 }
 
+const validateAttributeInput = (type, name) => {
+  const trimmed = name.trim();
+  
+  // 1. General length validation
+  if (trimmed.length < 1) {
+    return { valid: false, message: 'Tên thuộc tính không được để trống!' };
+  }
+  if (trimmed.length > 50) {
+    return { valid: false, message: 'Tên thuộc tính không được dài quá 50 ký tự!' };
+  }
+
+  // 2. Specific validation by attribute type
+  switch (type) {
+    case 'kich-thuoc': {
+      // Vietnamese men's shirt sizes: S, M, L, XL, XXL, 3XL, 4XL, 5XL, numbers 35-46
+      const sizePattern = /^(size\s+|cỡ\s+|kích\s+thước\s+)?(xs|s|m|l|xl|xxl|xxxl|3xl|4xl|5xl|3[5-9]|4[0-6])$/i;
+      if (!sizePattern.test(trimmed)) {
+        return { 
+          valid: false, 
+          message: 'Kích thước phải là size chữ (XS, S, M, L, XL, XXL, 3XL,...) hoặc size số nam Việt Nam (35-46)!' 
+        };
+      }
+      break;
+    }
+    case 'chat-lieu': {
+      const fabricPattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s\d%-]+$/;
+      if (!fabricPattern.test(trimmed)) {
+        return { valid: false, message: 'Tên chất liệu chỉ được chứa chữ cái, khoảng trắng, số hoặc ký tự %!' };
+      }
+      const lowercase = trimmed.toLowerCase();
+      const validKeywords = ['cotton', 'linen', 'kaki', 'bamboo', 'lụa', 'tơ', 'polyester', 'poly', 'modal', 'rayon', 'viscose', 'nỉ', 'thun', 'len', 'bông', 'kate', 'jean', 'denim', 'spandex', 'chiffon', 'gấm', 'nilon', 'dạ', 'tweed', 'microfiber', 'oxford', 'poplin', 'flannel', 'tencel', 'voan', 'sợi', 'cá sấu', 'lacoste'];
+      const hasKeyword = validKeywords.some(keyword => lowercase.includes(keyword));
+      if (!hasKeyword) {
+        return { valid: false, message: 'Vui lòng nhập chất liệu vải thời trang hợp lệ (ví dụ: Cotton, Linen, Kaki, Bamboo, Lụa,...)!' };
+      }
+      break;
+    }
+    case 'xuat-xu': {
+      const originPattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s]+$/;
+      if (!originPattern.test(trimmed)) {
+        return { valid: false, message: 'Xuất xứ chỉ được chứa chữ cái và khoảng trắng!' };
+      }
+      break;
+    }
+    case 'loai-san-pham': {
+      const productTypePattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s\(\)]+$/;
+      if (!productTypePattern.test(trimmed)) {
+        return { valid: false, message: 'Loại sản phẩm chỉ được chứa chữ cái, khoảng trắng và dấu ngoặc đơn!' };
+      }
+      const lowercase = trimmed.toLowerCase();
+      const clothingKeywords = ['áo', 'quần', 'jacket', 't-shirt', 'polo', 'sơ mi', 'blazer', 'vest', 'khoác', 'hoodie', 'len', 'short', 'đùi', 'kaki', 'jeans', 'jogger', 'sịp', 'lót', 'phông', 'ba lỗ', 'tanktop', 'suit', 'tuxedo'];
+      const isClothing = clothingKeywords.some(kw => lowercase.includes(kw));
+      if (!isClothing) {
+        return { valid: false, message: 'Loại sản phẩm phải liên quan đến mặt hàng thời trang nam (ví dụ: Áo sơ mi, Áo thun, Áo polo, Quần short,...)!' };
+      }
+      break;
+    }
+    case 'kieu-dang': {
+      const stylePattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s\d-]+$/;
+      if (!stylePattern.test(trimmed)) {
+        return { valid: false, message: 'Kiểu dáng chỉ được chứa chữ cái, chữ số, khoảng trắng và dấu gạch ngang!' };
+      }
+      const lowercase = trimmed.toLowerCase();
+      const styleKeywords = ['fit', 'regular', 'slim', 'oversize', 'loose', 'boxy', 'comfort', 'suông', 'ôm', 'rộng', 'dáng', 'basic', 'unisex', 'modern', 'classic', 'athletic', 'tayraglan'];
+      const hasStyleKw = styleKeywords.some(kw => lowercase.includes(kw));
+      if (!hasStyleKw) {
+        return { valid: false, message: 'Kiểu dáng phải thuộc các kiểu dáng thời trang (ví dụ: Slim fit, Regular fit, Oversize, Suông rộng,...)!' };
+      }
+      break;
+    }
+    case 'co-ao': {
+      const collarPattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s\(\)]+$/;
+      if (!collarPattern.test(trimmed)) {
+        return { valid: false, message: 'Kiểu cổ áo chỉ được chứa chữ cái, khoảng trắng và dấu ngoặc đơn!' };
+      }
+      const lowercase = trimmed.toLowerCase();
+      const collarKeywords = ['cổ', 'bẻ', 'tròn', 'tim', 'chữ v', 'v', 'trụ', 'mao', 'tàu', 'đức', 'sơ mi', 'lọ', 'dựng', 'lá', 'sen', 'vest', 'polo', 'bo', 'ôm'];
+      const hasCollarKw = collarKeywords.some(kw => lowercase.includes(kw));
+      if (!hasCollarKw) {
+        return { valid: false, message: 'Kiểu cổ áo phải hợp lệ với thời trang nam mùa hè (ví dụ: Cổ tròn, Cổ bẻ, Cổ trụ, Cổ chữ V,...)!' };
+      }
+      break;
+    }
+    case 'tay-ao': {
+      const sleevePattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s]+$/;
+      if (!sleevePattern.test(trimmed)) {
+        return { valid: false, message: 'Kiểu tay áo chỉ được chứa chữ cái và khoảng trắng!' };
+      }
+      const lowercase = trimmed.toLowerCase();
+      const sleeveKeywords = ['tay', 'ngắn', 'dài', 'lỡ', 'cộc', 'nách', 'không', 'sát', 'phồng', 'raglan', 'lửng'];
+      const hasSleeveKw = sleeveKeywords.some(kw => lowercase.includes(kw));
+      if (!hasSleeveKw) {
+        return { valid: false, message: 'Kiểu tay áo phải hợp lệ với thời trang nam mùa hè (ví dụ: Tay ngắn, Tay dài, Tay lỡ, Không tay,...)!' };
+      }
+      break;
+    }
+    case 'vai-ao': {
+      const shoulderPattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s]+$/;
+      if (!shoulderPattern.test(trimmed)) {
+        return { valid: false, message: 'Kiểu vai áo chỉ được chứa chữ cái và khoảng trắng!' };
+      }
+      const lowercase = trimmed.toLowerCase();
+      const shoulderKeywords = ['vai', 'thường', 'trễ', 'raglan', 'đệm', 'mút', 'suông', 'rộng', 'bồng', 'ngang', 'xuôi'];
+      const hasShoulderKw = shoulderKeywords.some(kw => lowercase.includes(kw));
+      if (!hasShoulderKw) {
+        return { valid: false, message: 'Kiểu vai áo phải hợp lệ với thời trang nam mùa hè (ví dụ: Vai thường, Vai trễ, Vai raglan,...)!' };
+      }
+      break;
+    }
+    case 'mau-sac': {
+      const colorPattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s\d]+$/;
+      if (!colorPattern.test(trimmed)) {
+        return { valid: false, message: 'Màu sắc chỉ được chứa chữ cái, chữ số và khoảng trắng!' };
+      }
+      break;
+    }
+    case 'thuong-hieu': {
+      const brandPattern = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂĐÊÔƠƯưăâđêôơư\s\d&.-]+$/;
+      if (!brandPattern.test(trimmed)) {
+        return { valid: false, message: 'Thương hiệu chỉ được chứa chữ cái, chữ số, khoảng trắng, &, . hoặc -!' };
+      }
+      break;
+    }
+  }
+
+  return { valid: true };
+}
+
 // Save Inline Editing inside Detail Modal
 const saveEditInDetail = async () => {
   if (!tempEditName.value || !tempEditName.value.trim()) {
     showToast(`Vui lòng nhập tên ${currentConfig.value.itemName}!`, 'error')
+    return
+  }
+
+  const validation = validateAttributeInput(currentType.value, tempEditName.value)
+  if (!validation.valid) {
+    showToast(validation.message, 'error')
     return
   }
   
@@ -473,6 +607,12 @@ const handleAdd = () => {
 const submitAdd = async () => {
   if (!newAttributeName.value || !newAttributeName.value.trim()) {
     showToast(`Vui lòng nhập tên ${currentConfig.value.itemName}!`, 'error')
+    return
+  }
+
+  const validation = validateAttributeInput(currentType.value, newAttributeName.value)
+  if (!validation.valid) {
+    showToast(validation.message, 'error')
     return
   }
   

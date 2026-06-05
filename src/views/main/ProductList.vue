@@ -184,7 +184,7 @@ const fetchProducts = async (page = 0) => {
         price: item.giaThapNhat === item.giaCaoNhat
           ? `${formatPrice(item.giaThapNhat)}₫`
           : `${formatPrice(item.giaThapNhat)}₫ - ${formatPrice(item.giaCaoNhat)}₫`,
-        isActive: item.trangThai === 1,
+        isActive: (item.tongTonKho ?? 0) === 0 ? false : (item.trangThai === 1),
         image: formatImage(item.hinhAnh)
       }))
       totalPages.value = data.totalPages || 1
@@ -233,27 +233,35 @@ const filterResults = () => {
 }
 
 const handleToggle = (product) => {
-  const originalState = !product.isActive
+  const newState = product.isActive
+  const oldState = !product.isActive
+  
+  // Revert toggle visually until confirmed
+  product.isActive = oldState
+
+  if (newState && product.stock === 0) {
+    showToast('Không thể mở bán sản phẩm có tồn kho bằng 0!', 'error')
+    return
+  }
+
   triggerConfirm(
-    `Bạn có chắc chắn muốn ${originalState ? 'ngừng bán' : 'mở bán lại'} sản phẩm "${product.name}" không?`,
+    `Bạn có chắc chắn muốn ${newState ? 'mở bán lại' : 'ngừng bán'} sản phẩm "${product.name}" không?`,
     async () => {
       try {
         const res = await api.patch(`/api/v1/san-pham/${product.id}/status`)
         if (res._wrapper && res._wrapper.status && res._wrapper.status.includes('ERROR')) {
           showToast(`Đổi trạng thái thất bại: ${res._wrapper.message}`, 'error')
-          product.isActive = originalState
         } else {
-          showToast(`Đã thay đổi trạng thái sản phẩm sang ${!originalState ? 'Đang bán' : 'Ngừng bán'} thành công!`, 'success')
+          showToast(`Đã thay đổi trạng thái sản phẩm sang ${newState ? 'Đang bán' : 'Ngừng bán'} thành công!`, 'success')
+          await fetchProducts(currentPage.value)
         }
       } catch (err) {
-        console.warn('Backend patch status not supported or failed, keeping toggle change:', err)
+        console.warn('Backend patch status not supported or failed:', err)
         showToast('Thay đổi trạng thái thất bại, vui lòng thử lại sau!', 'error')
-        product.isActive = originalState
       }
     },
     'Thay đổi trạng thái sản phẩm'
   )
-  product.isActive = originalState
 }
 
 const viewVariants = (product) => {
@@ -298,8 +306,83 @@ const openEditModal = async (product) => {
 }
 
 const updateProduct = async () => {
-  if (!editForm.value.tenSanPham.trim()) {
-    showToast('Vui lòng nhập tên sản phẩm!', 'error')
+  const missingFields = []
+  let isValid = true
+
+  // 1. Tên sản phẩm: Phải chứa các từ khóa liên quan đến áo nam mùa hè, độ dài từ 6 đến 100 ký tự
+  if (!editForm.value.tenSanPham || !editForm.value.tenSanPham.trim()) {
+    missingFields.push('Tên sản phẩm không được để trống.')
+    isValid = false
+  } else {
+    const nameLower = editForm.value.tenSanPham.trim().toLowerCase()
+    const summerKeywords = ['áo thun', 'áo phông', 'áo sơ mi', 'áo polo', 'áo ba lỗ', 'áo cộc', 'áo ngắn tay', 'áo sát nách', 'áo hawaii', 'áo đi biển', 'tank top', 'tanktop']
+    const hasKeyword = summerKeywords.some(keyword => nameLower.includes(keyword))
+    if (!hasKeyword) {
+      missingFields.push('Tên sản phẩm phải chứa từ khóa liên quan đến áo nam mùa hè (áo thun, sơ mi, polo, ba lỗ, cộc tay, v.v.).')
+      isValid = false
+    } else if (editForm.value.tenSanPham.trim().length < 6 || editForm.value.tenSanPham.trim().length > 100) {
+      missingFields.push('Độ dài tên sản phẩm phải từ 6 đến 100 ký tự.')
+      isValid = false
+    }
+  }
+
+  // 2. Kiểm tra thương hiệu, xuất xứ, loại áo, kiểu dáng
+  if (!editForm.value.idThuongHieu) {
+    missingFields.push('Thương hiệu chưa được chọn.')
+    isValid = false
+  }
+  if (!editForm.value.idXuatSu) {
+    missingFields.push('Xuất xứ chưa được chọn.')
+    isValid = false
+  }
+  if (!editForm.value.idLoaiSanPham) {
+    missingFields.push('Loại sản phẩm chưa được chọn.')
+    isValid = false
+  }
+  if (!editForm.value.idKieuDang) {
+    missingFields.push('Kiểu dáng chưa được chọn.')
+    isValid = false
+  }
+
+  // 3. Chất liệu: Mùa hè không dùng chất liệu nóng như Len, Nỉ, Dạ, Phao, Giữ nhiệt
+  if (!editForm.value.idChatLieu) {
+    missingFields.push('Chất liệu chưa được chọn.')
+    isValid = false
+  } else {
+    const materialObj = materials.value.find(m => m.id == editForm.value.idChatLieu)
+    if (materialObj) {
+      const matName = materialObj.name.toLowerCase()
+      const winterMaterials = ['len', 'nỉ', 'dạ', 'phao', 'giữ nhiệt']
+      const isWinterMat = winterMaterials.some(m => matName.includes(m))
+      if (isWinterMat) {
+        missingFields.push(`Chất liệu phù hợp mùa hè (Hiện chọn "${materialObj.name}" không phù hợp).`)
+        isValid = false
+      }
+    }
+  }
+
+  // 4. Các bộ phận cấu tạo áo
+  if (!editForm.value.idCoAo) {
+    missingFields.push('Cổ áo chưa được chọn.')
+    isValid = false
+  }
+  if (!editForm.value.idTayAo) {
+    missingFields.push('Tay áo chưa được chọn.')
+    isValid = false
+  }
+  if (!editForm.value.idVaiAo) {
+    missingFields.push('Vai áo chưa được chọn.')
+    isValid = false
+  }
+
+  // 5. Hình ảnh đại diện
+  if (!editForm.value.hinhAnh) {
+    missingFields.push('Hình ảnh đại diện sản phẩm chưa có.')
+    isValid = false
+  }
+
+  if (!isValid) {
+    showToast('Vui lòng kiểm tra thông tin hợp lệ:\n- ' + missingFields.join('\n- '), 'error')
     return
   }
 
@@ -828,11 +911,16 @@ onMounted(() => {
                 <td class="px-6 py-4">
                   <div class="flex items-center justify-center gap-2">
                     <!-- Toggle Switch -->
-                    <label class="relative inline-flex items-center cursor-pointer group mr-1">
+                    <label 
+                      class="relative inline-flex items-center group mr-1"
+                      :class="product.stock === 0 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'"
+                      :title="product.stock === 0 ? 'Không thể mở bán khi tồn kho bằng 0' : 'Đổi trạng thái'"
+                    >
                       <input
                         type="checkbox"
                         class="sr-only peer"
                         v-model="product.isActive"
+                        :disabled="product.stock === 0"
                         @change="handleToggle(product)"
                       />
                       <div class="relative w-10 h-5 bg-gray-300 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-400 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
