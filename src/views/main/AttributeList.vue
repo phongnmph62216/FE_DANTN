@@ -2,186 +2,14 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../../services/api'
+import { ATTRIBUTE_DEFINITIONS } from './attributeConfig'
 
 const route = useRoute()
 
-// Dictionary containing configurations and local fallback mock data for all 10 attributes
-const attributeConfigs = ref({
-  'chat-lieu': {
-    title: 'QUẢN LÝ CHẤT LIỆU',
-    itemName: 'chất liệu',
-    codeLabel: 'Mã chất liệu',
-    nameLabel: 'Tên chất liệu',
-    addBtnLabel: 'Thêm chất liệu',
-    searchPlaceholder: 'Tìm kiếm chất liệu...',
-    prefix: 'CL',
-    apiPath: '/api/v1/chat-lieu',
-    propName: 'ChatLieu',
-    mockData: [
-      { id: 1, code: 'CL001', name: 'Linen cao cấp', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'CL002', name: 'Cotton 4 chiều', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'CL003', name: 'Kaki Nhật', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'CL004', name: 'Polyester bóng', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'xuat-xu': {
-    title: 'QUẢN LÝ XUẤT XỨ',
-    itemName: 'xuất xứ',
-    codeLabel: 'Mã xuất xứ',
-    nameLabel: 'Tên xuất xứ',
-    addBtnLabel: 'Thêm xuất xứ',
-    searchPlaceholder: 'Tìm kiếm xuất xứ...',
-    prefix: 'XX',
-    apiPath: '/api/v1/xuat-su',
-    propName: 'XuatSu',
-    mockData: [
-      { id: 1, code: 'XX001', name: 'Việt Nam', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'XX002', name: 'Trung Quốc', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'XX003', name: 'Hàn Quốc', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'XX004', name: 'Nhật Bản', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'loai-san-pham': {
-    title: 'QUẢN LÝ LOẠI SẢN PHẨM',
-    itemName: 'loại sản phẩm',
-    codeLabel: 'Mã loại sản phẩm',
-    nameLabel: 'Tên loại sản phẩm',
-    addBtnLabel: 'Thêm loại sản phẩm',
-    searchPlaceholder: 'Tìm kiếm loại sản phẩm...',
-    prefix: 'LSP',
-    apiPath: '/api/v1/loai-san-pham',
-    propName: 'LoaiSanPham',
-    mockData: [
-      { id: 1, code: 'LSP001', name: 'Áo sơ mi', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'LSP002', name: 'Áo thun', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'LSP003', name: 'Áo polo', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'LSP004', name: 'Quần tây', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'thuong-hieu': {
-    title: 'QUẢN LÝ THƯƠNG HIỆU',
-    itemName: 'thương hiệu',
-    codeLabel: 'Mã thương hiệu',
-    nameLabel: 'Tên thương hiệu',
-    addBtnLabel: 'Thêm thương hiệu',
-    searchPlaceholder: 'Tìm kiếm thương hiệu...',
-    prefix: 'TH',
-    apiPath: '/api/v1/thuong-hieu',
-    propName: 'ThuongHieu',
-    mockData: [
-      { id: 1, code: 'TH001', name: 'Bee Stylish', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'TH002', name: 'Nike Sport', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'TH003', name: 'Adidas Neo', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'TH004', name: 'Puma Fast', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'kieu-dang': {
-    title: 'QUẢN LÝ KIỂU DÁNG',
-    itemName: 'kiểu dáng',
-    codeLabel: 'Mã kiểu dáng',
-    nameLabel: 'Tên kiểu dáng',
-    addBtnLabel: 'Thêm kiểu dáng',
-    searchPlaceholder: 'Tìm kiếm kiểu dáng...',
-    prefix: 'KD',
-    apiPath: '/api/v1/kieu-dang',
-    propName: 'KieuDang',
-    mockData: [
-      { id: 1, code: 'KD001', name: 'Slim fit', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'KD002', name: 'Regular fit', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'KD003', name: 'Oversize', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'KD004', name: 'Loose fit', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'co-ao': {
-    title: 'QUẢN LÝ CỔ ÁO',
-    itemName: 'cổ áo',
-    codeLabel: 'Mã cổ áo',
-    nameLabel: 'Kiểu cổ áo',
-    addBtnLabel: 'Thêm cổ áo',
-    searchPlaceholder: 'Tìm kiếm kiểu cổ áo...',
-    prefix: 'CA',
-    apiPath: '/api/v1/co-ao',
-    propName: 'CoAo',
-    mockData: [
-      { id: 1, code: 'CA001', name: 'Cổ bẻ (Polo)', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'CA002', name: 'Cổ tròn', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'CA003', name: 'Cổ chữ V', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'CA004', name: 'Cổ trụ (Mao)', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'tay-ao': {
-    title: 'QUẢN LÝ TAY ÁO',
-    itemName: 'tay áo',
-    codeLabel: 'Mã tay áo',
-    nameLabel: 'Kiểu tay áo',
-    addBtnLabel: 'Thêm tay áo',
-    searchPlaceholder: 'Tìm kiếm kiểu tay áo...',
-    prefix: 'TA',
-    apiPath: '/api/v1/tay-ao',
-    propName: 'TayAo',
-    mockData: [
-      { id: 1, code: 'TA001', name: 'Tay ngắn', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'TA002', name: 'Tay dài', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'TA003', name: 'Tay lỡ', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'TA004', name: 'Không tay', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'vai-ao': {
-    title: 'QUẢN LÝ VAI ÁO',
-    itemName: 'vai áo',
-    codeLabel: 'Mã vai áo',
-    nameLabel: 'Kiểu vai áo',
-    addBtnLabel: 'Thêm vai áo',
-    searchPlaceholder: 'Tìm kiếm kiểu vai áo...',
-    prefix: 'VA',
-    apiPath: '/api/v1/vai-ao',
-    propName: 'VaiAo',
-    mockData: [
-      { id: 1, code: 'VA001', name: 'Vai thường', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'VA002', name: 'Vai trễ', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'VA003', name: 'Vai raglan', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'VA004', name: 'Vai đệm mút', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'mau-sac': {
-    title: 'QUẢN LÝ MÀU SẮC',
-    itemName: 'màu sắc',
-    codeLabel: 'Mã màu sắc',
-    nameLabel: 'Tên màu sắc',
-    addBtnLabel: 'Thêm màu sắc',
-    searchPlaceholder: 'Tìm kiếm màu sắc...',
-    prefix: 'MS',
-    apiPath: '/api/v1/mau-sac',
-    propName: 'MauSac',
-    mockData: [
-      { id: 1, code: 'MS001', name: 'Đỏ Ruby', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'MS002', name: 'Xanh Navy', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'MS003', name: 'Đen Huyền', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'MS004', name: 'Trắng Sữa', date: '20/10/2023', isActive: false },
-    ]
-  },
-  'kich-thuoc': {
-    title: 'QUẢN LÝ KÍCH THƯỚC',
-    itemName: 'kích thước',
-    codeLabel: 'Mã kích thước',
-    nameLabel: 'Tên kích thước',
-    addBtnLabel: 'Thêm kích thước',
-    searchPlaceholder: 'Tìm kiếm kích thước...',
-    prefix: 'KT',
-    apiPath: '/api/v1/kich-thuoc',
-    propName: 'KichThuoc',
-    mockData: [
-      { id: 1, code: 'KT001', name: 'Kích thước S', date: '10/10/2023', isActive: true },
-      { id: 2, code: 'KT002', name: 'Kích thước M', date: '12/10/2023', isActive: true },
-      { id: 3, code: 'KT003', name: 'Kích thước L', date: '15/10/2023', isActive: true },
-      { id: 4, code: 'KT004', name: 'Kích thước XL', date: '20/10/2023', isActive: false },
-    ]
-  }
-})
-
-// Current route parameter determining active attribute
 const currentType = computed(() => route.params.type || 'xuat-xu')
-const currentConfig = computed(() => attributeConfigs.value[currentType.value] || attributeConfigs.value['xuat-xu'])
+const currentConfig = computed(
+  () => ATTRIBUTE_DEFINITIONS[currentType.value] || ATTRIBUTE_DEFINITIONS['xuat-xu']
+)
 
 // Filters and Paginations
 const searchQuery = ref('')
@@ -193,6 +21,7 @@ const totalElements = ref(0)
 const items = ref([])
 const isLoading = ref(false)
 const fetchError = ref(false)
+const actionError = ref('')
 
 // Helper: Format backend date (ISO LocalDateTime) to DD/MM/YYYY
 const formatDate = (dateStr) => {
@@ -206,22 +35,25 @@ const formatDate = (dateStr) => {
   }
 }
 
-// Map single Backend DTO to Frontend list model (backend uses ma/ten, not maChatLieu/tenChatLieu)
+// Map single Backend DTO to Frontend list model dynamically based on current entity fields
 const mapFromBackend = (item) => {
   return {
     id: item.id,
-    code: item.ma ?? '',
-    name: item.ten ?? '',
+    code: item[currentConfig.value.codeField] ?? '',
+    name: item[currentConfig.value.nameField] ?? '',
     date: formatDate(item.ngayTao),
     isActive: item.trangThai === 1
   }
 }
 
-// Map parameters to Backend POST/PUT DTO format
+// Map parameters to Backend POST/PUT DTO format dynamically
 const mapToBackend = (name, isActive, code = null) => {
-  const data = { ten: name, trangThai: isActive ? 1 : 0 }
+  const data = { 
+    [currentConfig.value.nameField]: name, 
+    trangThai: isActive ? 1 : 0 
+  }
   if (code !== null) {
-    data.ma = code
+    data[currentConfig.value.codeField] = code
   }
   return data
 }
@@ -256,30 +88,10 @@ const fetchItems = async () => {
     totalElements.value = pageData.totalElements ?? pageData.content.length
   } catch (error) {
     fetchError.value = true
-    console.warn('API error, falling back to local mock data:', error)
-    
-    // Fail-safe Mock Data Handler
-    let list = currentConfig.value.mockData
-    
-    if (searchQuery.value) {
-      const q = searchQuery.value.toLowerCase()
-      list = list.filter(item => 
-        item.code.toLowerCase().includes(q) || 
-        item.name.toLowerCase().includes(q)
-      )
-    }
-    
-    if (statusFilter.value === 'active') {
-      list = list.filter(item => item.isActive)
-    } else if (statusFilter.value === 'inactive') {
-      list = list.filter(item => !item.isActive)
-    }
-    
-    totalElements.value = list.length
-    totalPages.value = Math.ceil(list.length / pageSize.value) || 1
-    
-    const startOffset = currentPage.value * pageSize.value
-    items.value = list.slice(startOffset, startOffset + pageSize.value)
+    console.error('Failed to load attributes:', error)
+    items.value = []
+    totalPages.value = 1
+    totalElements.value = 0
   } finally {
     isLoading.value = false
   }
@@ -324,6 +136,7 @@ onMounted(() => {
 
 // Open Details Modal
 const showDetails = (item) => {
+  actionError.value = ''
   selectedItem.value = item
   tempEditName.value = item.name
   isEditingDetail.value = false
@@ -343,11 +156,12 @@ const cancelEditInDetail = () => {
 
 // Save Inline Editing inside Detail Modal
 const saveEditInDetail = async () => {
+  actionError.value = ''
   if (!tempEditName.value || !tempEditName.value.trim()) {
-    alert(`Vui lòng nhập tên ${currentConfig.value.itemName}!`)
+    actionError.value = `Vui lòng nhập tên ${currentConfig.value.itemName}.`
     return
   }
-  
+
   try {
     const payload = mapToBackend(
       tempEditName.value.trim(),
@@ -355,72 +169,50 @@ const saveEditInDetail = async () => {
       selectedItem.value.code
     )
     await api.put(`${currentConfig.value.apiPath}/${selectedItem.value.id}`, payload)
-    
-    selectedItem.value.name = tempEditName.value.trim()
     isEditingDetail.value = false
     await fetchItems()
   } catch (error) {
     console.error('Error updating attribute:', error)
-    // Fallback updating offline
-    selectedItem.value.name = tempEditName.value.trim()
-    isEditingDetail.value = false
-    alert('Không thể lưu thay đổi trên server, đã cập nhật tạm thời trên UI.')
+    actionError.value = 'Không thể lưu thay đổi. Vui lòng thử lại.'
   }
 }
 
 // Open Add Modal
 const handleAdd = () => {
+  actionError.value = ''
   newAttributeName.value = ''
   showAddModal.value = true
 }
 
 // Confirm Add
 const submitAdd = async () => {
+  actionError.value = ''
   if (!newAttributeName.value || !newAttributeName.value.trim()) {
-    alert(`Vui lòng nhập tên ${currentConfig.value.itemName}!`)
+    actionError.value = `Vui lòng nhập tên ${currentConfig.value.itemName}.`
     return
   }
-  
+
   try {
     const payload = mapToBackend(newAttributeName.value.trim(), true)
     await api.post(currentConfig.value.apiPath, payload)
-    
     showAddModal.value = false
+    newAttributeName.value = ''
     await fetchItems()
   } catch (error) {
     console.error('Error adding attribute:', error)
-    
-    // Offline Mock Fallback
-    const currentItems = currentConfig.value.mockData
-    const nextId = currentItems.length > 0 ? Math.max(...currentItems.map(item => item.id)) + 1 : 1
-    const codeNum = String(nextId).padStart(3, '0')
-    const newCode = `${currentConfig.value.prefix}${codeNum}`
-    const today = new Date()
-    const dateStr = `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`
-    
-    currentItems.push({
-      id: nextId,
-      code: newCode,
-      name: newAttributeName.value.trim(),
-      date: dateStr,
-      isActive: true
-    })
-    
-    showAddModal.value = false
-    await fetchItems()
-    alert('Không kết nối được server, đã thêm mới thuộc tính tạm thời vào bộ nhớ cục bộ.')
+    actionError.value = 'Không thể thêm mới. Vui lòng kiểm tra backend và thử lại.'
   }
 }
 
 // Action toggle status
 const toggleStatus = async (item) => {
+  const previousActive = !item.isActive
   try {
     await api.patch(`${currentConfig.value.apiPath}/${item.id}/status`)
     await fetchItems()
   } catch (error) {
+    item.isActive = previousActive
     console.error('Error toggling status:', error)
-    // Fallback: update status locally
-    console.log(`Đổi trạng thái offline của ${item.code} sang: ${item.isActive}`)
   }
 }
 </script>
@@ -620,6 +412,8 @@ const toggleStatus = async (item) => {
         </button>
       </div>
 
+      <p v-if="actionError && showAddModal" class="text-sm text-red-600">{{ actionError }}</p>
+
       <div class="space-y-2">
         <label class="text-sm font-semibold text-[#0D2533]">
           Tên {{ currentConfig.itemName }} mới
@@ -677,6 +471,8 @@ const toggleStatus = async (item) => {
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
+
+      <p v-if="actionError && showDetailModal" class="text-sm text-red-600">{{ actionError }}</p>
 
       <div class="space-y-3 py-2">
         <div class="flex items-center justify-between border-b border-gray-50 pb-2">
