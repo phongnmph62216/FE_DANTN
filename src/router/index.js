@@ -24,6 +24,31 @@ const router = createRouter({
       component: AttributeList,
       meta: { layout: 'DashboardLayout' },
     },
+    {
+      path: '/hoa-don',
+      name: 'HoaDonList',
+      component: () => import('../views/main/hoa-don/HoaDonList.vue'),
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/hoa-don/quet-qr',
+      name: 'QuetQrHoaDon',
+      component: () => import('../views/main/hoa-don/QrScanner.vue'),
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/hoa-don/:id',
+      name: 'HoaDonDetail',
+      component: () => import('../views/main/hoa-don/HoaDonDetail.vue'),
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/hoa-don/:id/in',
+      name: 'InHoaDon',
+      component: () => import('../views/main/hoa-don/InHoaDon.vue'),
+      meta: { layout: 'DashboardLayout' },
+    },
+
   ],
 })
 
