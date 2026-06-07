@@ -278,7 +278,17 @@ const isActiveRoute = (path) => {
           </button>
           <div class="pl-11 pr-4 py-1 flex flex-col gap-1" v-show="menuStates.accounts && sidebarExpanded">
             <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Khách hàng</a>
-            <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Nhân viên</a>
+           
+            <RouterLink
+  to="/nhan-vien"
+  class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+  :class="isActiveRoute('/nhan-vien')
+    ? 'text-[#EF972D] font-semibold'
+    : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+>
+  Nhân viên
+</RouterLink>
+
           </div>
         </li>
 
