@@ -13,7 +13,7 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <button @click="fetchInvoices"
+                    <button @click="fetchInvoices(0)"
                         class="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-semibold flex items-center gap-2 shadow-sm hover:bg-gray-50 transition-all font-body-md cursor-pointer">
                         <span class="material-symbols-outlined">refresh</span>
                         Tải lại
@@ -125,57 +125,39 @@
                 </div>
             </div>
 
-         <!-- Filters -->
-<div class="bg-white p-6 rounded-2xl border border-surface-container shadow-sm space-y-6">
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
-    <div class="relative xl:col-span-2">
-      <span
-        class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl"
-      >
-        search
-      </span>
+            <!-- Filters -->
+            <div class="bg-white p-6 rounded-2xl border border-surface-container shadow-sm space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+                    <div class="relative xl:col-span-2">
+                        <span
+                            class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">
+                            search
+                        </span>
 
-      <input
-        v-model="filters.keyword"
-        class="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] text-base transition-all font-body-md"
-        placeholder="Nhập mã hóa đơn, SĐT hoặc tên khách hàng..."
-        type="text"
-      />
-    </div>
+                        <input v-model="filters.keyword"
+                            class="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] text-base transition-all font-body-md"
+                            placeholder="Nhập mã hóa đơn, SĐT hoặc tên khách hàng..." type="text" />
+                    </div>
 
-    <input
-      v-model="filters.fromDate"
-      type="date"
-      class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-3 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] cursor-pointer font-body-md"
-    />
+                    <input v-model="filters.fromDate" type="date"
+                        class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-3 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] cursor-pointer font-body-md" />
 
-    <input
-      v-model="filters.toDate"
-      type="date"
-      class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-3 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] cursor-pointer font-body-md"
-    />
+                    <input v-model="filters.toDate" type="date"
+                        class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-3 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] cursor-pointer font-body-md" />
 
-    <input
-      :value="formatInputMoney(filters.minTotal)"
-      @input="filters.minTotal = parseInputMoney($event.target.value)"
-      type="text"
-      inputmode="numeric"
-      class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-3 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] font-body-md"
-      placeholder="Từ số tiền"
-    />
+                    <input :value="formatInputMoney(filters.minTotal)"
+                        @input="filters.minTotal = parseInputMoney($event.target.value)" type="text" inputmode="numeric"
+                        class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-3 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] font-body-md"
+                        placeholder="Từ số tiền" />
 
-    <input
-      :value="formatInputMoney(filters.maxTotal)"
-      @input="filters.maxTotal = parseInputMoney($event.target.value)"
-      type="text"
-      inputmode="numeric"
-      class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-3 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] font-body-md"
-      placeholder="Đến số tiền"
-    />
-  </div>
-
-  <div class="flex flex-wrap items-center justify-between gap-6 pt-4 border-t border-gray-100">
-    <div class="flex flex-wrap items-center gap-4">
+                    <input :value="formatInputMoney(filters.maxTotal)"
+                        @input="filters.maxTotal = parseInputMoney($event.target.value)" type="text" inputmode="numeric"
+                        class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-3 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] font-body-md"
+                        placeholder="Đến số tiền" />
+                </div>
+<div class="space-y-4 pt-4 border-t border-gray-100">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-3">
       <select
         v-model="filters.invoiceType"
         class="bg-gray-50 border border-gray-200 rounded-xl text-sm px-4 py-2.5 focus:ring-2 focus:ring-[#EF972D]/20 focus:border-[#EF972D] min-w-[170px] cursor-pointer font-body-md"
@@ -195,35 +177,6 @@
         <option value="COD">COD</option>
         <option value="VNPAY">VNPay</option>
       </select>
-
-      <div class="h-8 w-px bg-gray-200 mx-2 hidden md:block"></div>
-
-      <div class="flex flex-wrap items-center gap-5">
-        <label
-          v-for="status in statusOptions"
-          :key="status.value"
-          class="flex items-center gap-2 cursor-pointer group"
-        >
-          <div class="relative flex items-center justify-center">
-            <input
-              class="peer sr-only"
-              name="invoiceStatus"
-              type="radio"
-              :value="status.value"
-              v-model="filters.status"
-            />
-            <div class="w-5 h-5 rounded-full border-2 border-gray-300 peer-checked:border-[#EF972D] transition-colors"></div>
-            <div class="absolute w-2.5 h-2.5 rounded-full bg-[#EF972D] scale-0 peer-checked:scale-100 transition-transform"></div>
-          </div>
-
-          <span
-            :class="filters.status === status.value ? 'text-[#0D2533] font-semibold' : 'text-gray-600'"
-            class="text-sm font-medium transition-colors font-body-md"
-          >
-            {{ status.label }}
-          </span>
-        </label>
-      </div>
     </div>
 
     <div class="flex items-center gap-3">
@@ -243,7 +196,42 @@
       </button>
     </div>
   </div>
+
+ <div class="w-full border-t border-gray-100 pt-4">
+  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+    <button
+      v-for="status in statusOptions"
+      :key="status.value"
+      type="button"
+      @click="filters.status = status.value; filterResults()"
+      :class="filters.status === status.value
+        ? 'bg-[#0D2533] text-white shadow-md border-[#0D2533]'
+        : 'bg-white text-gray-600 hover:bg-[#EF972D]/5 border-gray-200'"
+      class="h-12 px-4 rounded-xl text-sm font-semibold flex items-center justify-between gap-2 border transition-all"
+    >
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="material-symbols-outlined text-[20px] shrink-0">
+          {{ status.icon }}
+        </span>
+
+       <span class="whitespace-nowrap">
+  {{ status.label }}
+</span>
+      </div>
+
+      <span
+        :class="filters.status === status.value
+          ? 'bg-white/20 text-white'
+          : 'bg-[#EF972D]/10 text-[#EF972D]'"
+        class="min-w-6 h-6 px-2 rounded-full text-xs font-bold flex items-center justify-center shrink-0"
+      >
+        {{ countByStatus(status.value) }}
+      </span>
+    </button>
+  </div>
 </div>
+</div>
+            </div>
 
             <!-- Table -->
             <div class="bg-white rounded-xl border border-surface-container shadow-sm overflow-hidden relative">
@@ -337,14 +325,19 @@
                                     </span>
                                 </td>
 
-                                <td class="px-6 py-4 text-sm text-gray-600">
-                                    <div class="flex items-center gap-2">
-                                        <span class="material-symbols-outlined text-gray-400 text-[18px]">
-                                            {{ paymentIcon(invoice.phuongThucThanhToan) }}
-                                        </span>
-                                        {{ paymentLabel(invoice.phuongThucThanhToan) }}
-                                    </div>
-                                </td>
+                               <td class="px-6 py-4">
+  <div
+    :class="invoice.phuongThucThanhToan
+      ? 'bg-blue-50 text-blue-700'
+      : 'bg-gray-100 text-gray-500'"
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+  >
+    <span class="material-symbols-outlined text-[16px]">
+      {{ paymentIcon(invoice.phuongThucThanhToan) }}
+    </span>
+    {{ paymentLabel(invoice.phuongThucThanhToan) }}
+  </div>
+</td>
 
                                 <td class="px-6 py-4 text-sm text-right font-bold text-[#0D2533]">
                                     {{ formatCurrency(invoice.tongTienThanhToan) }}
@@ -362,15 +355,15 @@
                                 </td>
 
                                 <td class="px-6 py-4">
-                                    <div class="flex items-center justify-center gap-2">
+                                    <div class="flex items-center justify-center gap-1">
                                         <button type="button"
-                                            class="p-1.5 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                                            class="w-9 h-9 flex items-center justify-center text-gray-600 hover:text-[#0D2533] hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                                             title="Xem chi tiết" @click="viewInvoice(invoice)">
                                             <span class="material-symbols-outlined text-xl">visibility</span>
                                         </button>
 
                                         <button type="button"
-                                            class="p-1.5 text-[#EF972D] hover:bg-[#EF972D]/10 rounded-lg transition-colors cursor-pointer"
+                                            class="w-9 h-9 flex items-center justify-center text-[#EF972D] hover:bg-[#EF972D]/10 rounded-lg transition-colors cursor-pointer"
                                             title="In hóa đơn" @click="printInvoice(invoice)">
                                             <span class="material-symbols-outlined text-xl">print</span>
                                         </button>
@@ -378,16 +371,7 @@
                                         <button
                                             v-if="invoice.trangThai !== 'HOAN_THANH' && invoice.trangThai !== 'DA_HUY'"
                                             type="button"
-                                            class="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors cursor-pointer"
-                                            title="Cập nhật trạng thái" @click="changeStatus(invoice)">
-                                            <span
-                                                class="material-symbols-outlined text-xl">published_with_changes</span>
-                                        </button>
-
-                                        <button
-                                            v-if="invoice.trangThai !== 'HOAN_THANH' && invoice.trangThai !== 'DA_HUY'"
-                                            type="button"
-                                            class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                            class="w-9 h-9 flex items-center justify-center text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                                             title="Hủy hóa đơn" @click="cancelInvoice(invoice)">
                                             <span class="material-symbols-outlined text-xl">cancel</span>
                                         </button>
@@ -430,9 +414,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../../services/api'
+import { confirmAction, showToast, showErrorToast } from '../../../utils/alert'
+import QRCode from 'qrcode'
 
 const router = useRouter()
 
@@ -462,12 +448,12 @@ const filters = reactive({
 })
 
 const statusOptions = [
-    { value: 'all', label: 'Tất cả' },
-    { value: 'CHO_XAC_NHAN', label: 'Chờ xác nhận' },
-    { value: 'DANG_XU_LY', label: 'Đang xử lý' },
-    { value: 'DANG_GIAO', label: 'Đang giao' },
-    { value: 'HOAN_THANH', label: 'Hoàn thành' },
-    { value: 'DA_HUY', label: 'Đã hủy' },
+    { value: 'all', label: 'Tất cả', icon: 'receipt_long' },
+    { value: 'CHO_XAC_NHAN', label: 'Chờ xác nhận', icon: 'hourglass_top' },
+    { value: 'DANG_XU_LY', label: 'Đang xử lý', icon: 'inventory' },
+    { value: 'DANG_GIAO', label: 'Đang giao', icon: 'local_shipping' },
+    { value: 'HOAN_THANH', label: 'Hoàn thành', icon: 'check_circle' },
+    { value: 'DA_HUY', label: 'Đã hủy', icon: 'cancel' },
 ]
 
 const summary = reactive({
@@ -521,20 +507,68 @@ const filteredInvoices = computed(() => {
         )
     })
 })
+function countByStatus(status) {
+    const data = invoices.value.filter((item) => {
+        const keyword = filters.keyword.trim().toLowerCase()
+        const minTotal = filters.minTotal !== '' ? Number(filters.minTotal) : null
+        const maxTotal = filters.maxTotal !== '' ? Number(filters.maxTotal) : null
 
-const paginationLabel = computed(() => {
-    if (!filteredInvoices.value.length) {
-        return 'Hiển thị 0 hóa đơn'
+        const matchKeyword =
+            !keyword ||
+            String(item.maHoaDon || '').toLowerCase().includes(keyword) ||
+            String(item.tenKhachHang || '').toLowerCase().includes(keyword) ||
+            String(item.soDienThoai || '').toLowerCase().includes(keyword)
+
+        const matchType = !filters.invoiceType || item.loaiHoaDon === filters.invoiceType
+
+        const matchPayment =
+            !filters.paymentMethod ||
+            item.phuongThucThanhToan === filters.paymentMethod ||
+            !item.phuongThucThanhToan
+
+        const tongTien = Number(item.tongTienThanhToan || 0)
+        const matchMinTotal = minTotal === null || tongTien >= minTotal
+        const matchMaxTotal = maxTotal === null || tongTien <= maxTotal
+
+        const ngayTao = item.ngayTao ? new Date(item.ngayTao) : null
+        const fromDate = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00`) : null
+        const toDate = filters.toDate ? new Date(`${filters.toDate}T23:59:59`) : null
+
+        const matchFromDate = !fromDate || (ngayTao && ngayTao >= fromDate)
+        const matchToDate = !toDate || (ngayTao && ngayTao <= toDate)
+
+        return (
+            matchKeyword &&
+            matchType &&
+            matchPayment &&
+            matchMinTotal &&
+            matchMaxTotal &&
+            matchFromDate &&
+            matchToDate
+        )
+    })
+
+    if (status === 'all') {
+        return data.length
     }
 
-    return `Hiển thị ${filteredInvoices.value.length} trong tổng số ${totalElements.value} hóa đơn`
+    return data.filter((item) => item.trangThai === status).length
+}
+const paginationLabel = computed(() => {
+  if (!filteredInvoices.value.length) {
+    return 'Hiển thị 0 hóa đơn'
+  }
+
+  return `Hiển thị ${filteredInvoices.value.length} hóa đơn phù hợp`
 })
 
 onMounted(() => {
     fetchInvoices()
 })
 async function fetchInvoices(page = 0) {
-    currentPage.value = page
+  const pageNumber = typeof page === 'number' ? page : 0
+
+  currentPage.value = pageNumber
     isLoading.value = true
     errorMessage.value = ''
 
@@ -563,27 +597,26 @@ async function fetchInvoices(page = 0) {
         isLoading.value = false
     }
 }
-
 function tinhTongQuan() {
-  const data = filteredInvoices.value
+    const data = filteredInvoices.value
 
-  summary.total = data.length
+    summary.total = data.length
 
-  summary.pending = data.filter((item) => {
-    return item.trangThai === 'CHO_XAC_NHAN'
-  }).length
+    summary.pending = data.filter((item) => {
+        return item.trangThai === 'CHO_XAC_NHAN'
+    }).length
 
-  summary.completed = data.filter((item) => {
-    return item.trangThai === 'HOAN_THANH'
-  }).length
+    summary.completed = data.filter((item) => {
+        return item.trangThai === 'HOAN_THANH'
+    }).length
 
-  summary.revenue = data
-    .filter((item) => {
-      return item.trangThai === 'HOAN_THANH'
-    })
-    .reduce((sum, item) => {
-      return sum + Number(item.tongTienThanhToan || 0)
-    }, 0)
+    summary.revenue = data
+        .filter((item) => {
+            return item.trangThai === 'HOAN_THANH'
+        })
+        .reduce((sum, item) => {
+            return sum + Number(item.tongTienThanhToan || 0)
+        }, 0)
 }
 
 function resetSummary() {
@@ -597,7 +630,14 @@ function filterResults() {
     clearSelected()
     tinhTongQuan()
 }
-
+watch(
+  filteredInvoices,
+  () => {
+    tinhTongQuan()
+    clearSelected()
+  },
+  { immediate: true }
+)
 function resetFilters() {
     filters.keyword = ''
     filters.fromDate = ''
@@ -611,7 +651,6 @@ function resetFilters() {
     clearSelected()
     tinhTongQuan()
 }
-
 function clearSelected() {
     selectAll.value = false
     selectedInvoiceIds.value = []
@@ -630,48 +669,21 @@ function printInvoice(invoice) {
     router.push(`/hoa-don/${invoice.id}/in`)
 }
 
-async function changeStatus(invoice) {
-    if (!invoice || !invoice.id) {
-        errorMessage.value = 'Không tìm thấy hóa đơn cần cập nhật'
-        return
-    }
-
-    if (invoice.trangThai === 'HOAN_THANH' || invoice.trangThai === 'DA_HUY') {
-        return
-    }
-
-    const confirmUpdate = window.confirm(`Xác nhận chuyển hóa đơn ${invoice.maHoaDon} sang trạng thái hoàn thành?`)
-
-    if (!confirmUpdate) {
-        return
-    }
-
-    isLoading.value = true
-    errorMessage.value = ''
-
-    try {
-        await api.put(`/hoa-don/${invoice.id}/trang-thai`, {
-            trangThai: 'HOAN_THANH',
-            ghiChu: 'Cập nhật trạng thái từ giao diện quản lý hóa đơn',
-        })
-
-        await fetchInvoices(currentPage.value)
-    } catch (error) {
-        console.error('Lỗi cập nhật trạng thái hóa đơn:', error)
-        errorMessage.value = getErrorMessage(error, 'Không thể cập nhật trạng thái hóa đơn')
-    } finally {
-        isLoading.value = false
-    }
-}
 async function cancelInvoice(invoice) {
     if (!invoice || !invoice.id) {
-        errorMessage.value = 'Không tìm thấy hóa đơn cần hủy'
+        showErrorToast('Không tìm thấy hóa đơn cần hủy')
         return
     }
 
-    const confirmCancel = window.confirm(`Bạn có chắc chắn muốn hủy hóa đơn ${invoice.maHoaDon} không?`)
+    const result = await confirmAction({
+        title: 'Hủy hóa đơn?',
+        text: `Bạn có chắc chắn muốn hủy hóa đơn ${invoice.maHoaDon} không?`,
+        confirmButtonText: 'Hủy hóa đơn',
+        cancelButtonText: 'Không hủy',
+        icon: 'warning',
+    })
 
-    if (!confirmCancel) {
+    if (!result.isConfirmed) {
         return
     }
 
@@ -684,20 +696,24 @@ async function cancelInvoice(invoice) {
         })
 
         await fetchInvoices(currentPage.value)
-        alert('Hủy hóa đơn thành công!')
+        showToast({ title: 'Hủy hóa đơn thành công!' })
     } catch (error) {
         console.error('Lỗi hủy hóa đơn:', error)
         errorMessage.value = getErrorMessage(error, 'Không thể hủy hóa đơn')
+        showErrorToast('Không thể hủy hóa đơn')
     } finally {
         isLoading.value = false
     }
 }
 async function exportExcel() {
-    const confirmExport = window.confirm('Bạn có chắc chắn muốn xuất danh sách hóa đơn ra Excel không?')
+    const result = await confirmAction({
+        title: 'Xuất Excel?',
+        text: 'Bạn có chắc chắn muốn xuất danh sách hóa đơn ra Excel không?',
+        confirmButtonText: 'Xuất Excel',
+        icon: 'question',
+    })
 
-    if (!confirmExport) {
-        return
-    }
+    if (!result.isConfirmed) return
 
     try {
         isLoading.value = true
@@ -718,10 +734,11 @@ async function exportExcel() {
 
         window.URL.revokeObjectURL(url)
 
-        alert('Xuất Excel thành công!')
+        showToast({ title: 'Xuất Excel thành công!' })
     } catch (error) {
         console.error('Lỗi xuất Excel:', error)
         errorMessage.value = getErrorMessage(error, 'Xuất Excel thất bại')
+        showErrorToast('Xuất Excel thất bại')
     } finally {
         isLoading.value = false
     }
@@ -735,12 +752,12 @@ function printSelected() {
     optionsOpen.value = false
 
     if (!selectedInvoiceIds.value.length) {
-        errorMessage.value = 'Vui lòng chọn ít nhất một hóa đơn để in'
+        showErrorToast('Vui lòng chọn ít nhất một hóa đơn để in')
         return
     }
 
     if (selectedInvoiceIds.value.length > 1) {
-        errorMessage.value = 'Hiện tại chỉ hỗ trợ in từng hóa đơn. Vui lòng chọn 1 hóa đơn.'
+        showErrorToast('Hiện tại chỉ hỗ trợ in từng hóa đơn. Vui lòng chọn 1 hóa đơn.')
         return
     }
 
@@ -826,14 +843,14 @@ function statusClass(value) {
     return map[value] || 'bg-gray-100 text-gray-700'
 }
 function parseInputMoney(value) {
-  return String(value || '').replace(/\D/g, '')
+    return String(value || '').replace(/\D/g, '')
 }
 
 function formatInputMoney(value) {
-  if (value === '' || value === null || value === undefined) {
-    return ''
-  }
+    if (value === '' || value === null || value === undefined) {
+        return ''
+    }
 
-  return new Intl.NumberFormat('vi-VN').format(Number(value))
+    return new Intl.NumberFormat('vi-VN').format(Number(value))
 }
 </script>

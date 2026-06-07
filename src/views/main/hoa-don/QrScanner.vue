@@ -89,7 +89,6 @@ onBeforeUnmount(() => {
 function goBack() {
   router.push('/hoa-don')
 }
-
 async function startScanner() {
   errorMessage.value = ''
   successMessage.value = ''
@@ -110,16 +109,24 @@ async function startScanner() {
       return
     }
 
-    const cameraId = cameras[0].id
+    const backCamera = cameras.find((camera) => {
+      return camera.label.toLowerCase().includes('back')
+    })
+
+    const cameraId = backCamera ? backCamera.id : cameras[0].id
 
     await html5QrCode.start(
       cameraId,
       {
-        fps: 10,
-        qrbox: {
-          width: 250,
-          height: 250,
-        },
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+  const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+  const size = Math.floor(minEdge * 0.85)
+
+  return {
+    width: size,
+    height: size,
+  }
+},
       },
       async (decodedText) => {
         await handleQrResult(decodedText)
@@ -128,12 +135,25 @@ async function startScanner() {
     )
 
     isScanning.value = true
+    errorMessage.value = ''
   } catch (error) {
     console.error('Lỗi mở camera:', error)
+
+    isScanning.value = false
+
+    if (error?.name === 'NotFoundError') {
+      errorMessage.value = 'Không tìm thấy camera trên thiết bị.'
+      return
+    }
+
+    if (error?.name === 'NotAllowedError') {
+      errorMessage.value = 'Bạn chưa cấp quyền camera cho trình duyệt.'
+      return
+    }
+
     errorMessage.value = 'Không mở được camera. Hãy cấp quyền camera và chạy bằng localhost hoặc HTTPS.'
   }
 }
-
 async function handleQrResult(decodedText) {
   if (isProcessing) {
     return
@@ -161,7 +181,6 @@ async function stopScanner() {
   try {
     if (html5QrCode && isScanning.value) {
       await html5QrCode.stop()
-      await html5QrCode.clear()
     }
   } catch (error) {
     console.error('Lỗi dừng camera:', error)
