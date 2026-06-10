@@ -371,7 +371,7 @@
 <script setup>
 import { reactive, ref, onMounted } from "vue";
 import axios from "axios";
-import NhanVienApi from "@/services/NhanVienAPI";
+import NhanVienApi from "@/services/NhanVienApi";
 import { useRouter, useRoute } from "vue-router";
 
 const route = useRoute();

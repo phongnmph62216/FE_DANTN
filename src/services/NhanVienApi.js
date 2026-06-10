@@ -23,7 +23,13 @@ const phuongXaList = ref([]);
 const selectedTinh = ref("");
 const selectedPhuong = ref("");
 
+const API_URL = "http://localhost:8080/api/nhan_vien";
 
+export const exportNhanVienExcel = () => {
+  return axios.get(`${API_URL}/export-excel`, {
+    responseType: "blob",
+  });
+};
 
 export default {
 

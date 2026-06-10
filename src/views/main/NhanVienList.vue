@@ -76,6 +76,7 @@
             </div>
           </div>
 
+            
           <!-- Reset -->
           <button
             @click="resetFilters"
@@ -85,6 +86,14 @@
               restart_alt
             </span>
             Đặt lại bộ lọc
+          </button>
+
+          <button
+            @click="handleExportExcel"
+            class="flex items-center gap-2 text-green-600 font-semibold hover:text-green-700 transition"
+          >
+            <span class="material-symbols-outlined"> file_save </span>
+            Xuất Excel
           </button>
         </div>
       </div>
@@ -226,9 +235,19 @@
       </div>
     </div>
 
-    <div v-if="showStatusMessage" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div class="w-full max-w-sm bg-white rounded-3xl p-6 shadow-xl text-center">
-        <p :class="['mb-4 text-lg font-semibold', statusSuccess ? 'text-green-600' : 'text-red-600']">
+    <div
+      v-if="showStatusMessage"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+    >
+      <div
+        class="w-full max-w-sm bg-white rounded-3xl p-6 shadow-xl text-center"
+      >
+        <p
+          :class="[
+            'mb-4 text-lg font-semibold',
+            statusSuccess ? 'text-green-600' : 'text-red-600',
+          ]"
+        >
           {{ statusMessage }}
         </p>
         <button
@@ -245,9 +264,9 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import NhanVienApi from "@/services/NhanVienAPI";
+import NhanVienApi from "@/services/NhanVienApi";
 import { useRouter } from "vue-router";
-
+import { exportNhanVienExcel } from "@/services/NhanVienApi";
 const router = useRouter();
 
 const goToEdit = (id) => {
@@ -319,10 +338,39 @@ const filteredNhanViens = computed(() => {
       String(item.trangThai) === selectedStatus.value;
 
     const matchRole =
-      selectedRole.value === "" ||
-      item.vaiTro === selectedRole.value;
+      selectedRole.value === "" || item.vaiTro === selectedRole.value;
 
     return matchKeyword && matchStatus && matchRole;
   });
 });
+
+const handleExportExcel = async () => {
+  try {
+    const response = await exportNhanVienExcel();
+
+    const blob = new Blob([response.data], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.setAttribute("download", "DanhSachNhanVien.xlsx");
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error(error);
+
+    alert("Xuất Excel thất bại");
+  }
+};
 </script>
