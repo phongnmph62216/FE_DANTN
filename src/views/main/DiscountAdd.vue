@@ -1,15 +1,19 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../../services/api'
 
+const route = useRoute()
 const router = useRouter()
+
+const isEditMode = computed(() => !!route.params.id)
 
 // Form state
 const discountName = ref('')
 const discountPercent = ref(null)
 const startDate = ref('')
 const endDate = ref('')
+const trangThai = ref(1)
 
 // Selected variant IDs
 const selectedVariantIds = ref([])
@@ -37,6 +41,34 @@ const handleConfirm = async () => {
   confirmModal.value.show = false
   if (cb) {
     await cb()
+  }
+}
+
+// Helper to format date string to yyyy-MM-dd
+const formatToInputDate = (dateStr) => {
+  if (!dateStr) return ''
+  if (dateStr.includes('T')) {
+    return dateStr.split('T')[0]
+  }
+  return dateStr.substring(0, 10)
+}
+
+const loadDiscountDetails = async () => {
+  if (!isEditMode.value) return
+  try {
+    const res = await api.get(`/api/v1/dot-giam-gia/${route.params.id}`)
+    const data = res.data
+    if (data) {
+      discountName.value = data.tenDotGiamGia || ''
+      discountPercent.value = data.phanTramGiam || null
+      startDate.value = formatToInputDate(data.ngayBatDau)
+      endDate.value = formatToInputDate(data.ngayKetThuc)
+      selectedVariantIds.value = data.danhSachIdChiTietSanPham || []
+      trangThai.value = data.trangThai ?? 1
+    }
+  } catch (err) {
+    console.error('Failed to load discount details:', err)
+    showToast('Không thể tải chi tiết đợt giảm giá này!', 'error')
   }
 }
 
@@ -355,8 +387,13 @@ const saveDiscount = () => {
     return
   }
 
+  const confirmMsg = isEditMode.value
+    ? `Bạn có chắc chắn muốn cập nhật đợt giảm giá "${discountName.value.trim()}" áp dụng cho ${selectedVariantIds.value.length} biến thể đã chọn?`
+    : `Bạn có chắc chắn muốn tạo đợt giảm giá "${discountName.value.trim()}" áp dụng cho ${selectedVariantIds.value.length} biến thể đã chọn?`
+  const confirmTitle = isEditMode.value ? 'Cập nhật đợt giảm giá' : 'Tạo đợt giảm giá mới'
+
   triggerConfirm(
-    `Bạn có chắc chắn muốn tạo đợt giảm giá "${discountName.value.trim()}" áp dụng cho ${selectedVariantIds.value.length} biến thể đã chọn?`,
+    confirmMsg,
     async () => {
       try {
         const payload = {
@@ -364,25 +401,31 @@ const saveDiscount = () => {
           phanTramGiam: discountPercent.value,
           ngayBatDau: `${startDate.value}T00:00:00`,
           ngayKetThuc: `${endDate.value}T23:59:59`,
-          danhSachIdChiTietSanPham: selectedVariantIds.value
+          danhSachIdChiTietSanPham: selectedVariantIds.value,
+          trangThai: trangThai.value
         }
 
-        const res = await api.post('/api/v1/dot-giam-gia', payload)
+        let res
+        if (isEditMode.value) {
+          res = await api.put(`/api/v1/dot-giam-gia/${route.params.id}`, payload)
+        } else {
+          res = await api.post('/api/v1/dot-giam-gia', payload)
+        }
         
         if (res._wrapper && res._wrapper.status && res._wrapper.status.includes('ERROR')) {
-          showToast(`Thêm đợt giảm giá thất bại: ${res._wrapper.message}`, 'error')
+          showToast(`${isEditMode.value ? 'Cập nhật' : 'Thêm'} đợt giảm giá thất bại: ${res._wrapper.message}`, 'error')
         } else {
-          showToast('Tạo mới đợt giảm giá thành công!', 'success')
+          showToast(`${isEditMode.value ? 'Cập nhật' : 'Tạo mới'} đợt giảm giá thành công!`, 'success')
           setTimeout(() => {
             router.push('/discounts')
           }, 1000)
         }
       } catch (err) {
-        console.error('Failed to create discount:', err)
-        showToast(err.response?.data?.message || 'Tạo mới đợt giảm giá thất bại, vui lòng thử lại sau!', 'error')
+        console.error(`Failed to ${isEditMode.value ? 'update' : 'create'} discount:`, err)
+        showToast(err.response?.data?.message || `${isEditMode.value ? 'Cập nhật' : 'Tạo mới'} đợt giảm giá thất bại, vui lòng thử lại sau!`, 'error')
       }
     },
-    'Tạo đợt giảm giá mới'
+    confirmTitle
   )
 }
 
@@ -391,6 +434,7 @@ onMounted(async () => {
   loadFilters()
   fetchProducts()
   fetchVariants()
+  await loadDiscountDetails()
 })
 </script>
 
@@ -401,7 +445,9 @@ onMounted(async () => {
       <!-- Left Column (Discount Form Card) -->
       <div class="form-card-column bg-white rounded-lg p-6 shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex flex-col justify-between">
         <div>
-          <h2 class="font-headline-md text-headline-md text-on-surface mb-6">Thêm đợt giảm giá</h2>
+          <h2 class="font-headline-md text-headline-md text-on-surface mb-6">
+            {{ isEditMode ? 'Cập nhật đợt giảm giá' : 'Thêm đợt giảm giá' }}
+          </h2>
           
           <div class="space-y-4">
             <!-- Tên đợt giảm giá -->

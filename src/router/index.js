@@ -52,6 +52,12 @@ const router = createRouter({
       component: DiscountAdd,
       meta: { layout: 'DashboardLayout' },
     },
+    {
+      path: '/discounts/edit/:id',
+      name: 'discount-edit',
+      component: DiscountAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
   ],
 })
 

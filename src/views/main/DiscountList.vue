@@ -217,9 +217,9 @@ const addDiscount = () => {
   router.push('/discounts/create')
 }
 
-// Edit discount placeholder alert
+// Edit discount action
 const openEditModal = (item) => {
-  showToast(`Chức năng chỉnh sửa đợt giảm giá "${item.tenDotGiamGia}" đang được phát triển ở backend!`, 'info')
+  router.push(`/discounts/edit/${item.id}`)
 }
 
 // Compute visible pages for pagination
