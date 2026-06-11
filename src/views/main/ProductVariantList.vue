@@ -84,6 +84,15 @@ const formatPrice = (amount) => {
   return `${new Intl.NumberFormat('vi-VN').format(amount)} đ`
 }
 
+const isDiscountActive = (v) => {
+  if (!v.phanTramGiam || v.trangThaiDotGiamGia !== 1) return false
+  if (!v.ngayBatDau || !v.ngayKetThuc) return false
+  const now = new Date()
+  const start = new Date(v.ngayBatDau)
+  const end = new Date(v.ngayKetThuc)
+  return now >= start && now <= end
+}
+
 const formatImage = (url) => {
   if (!url) return 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=150'
   if (url.startsWith('data:image/') || url.startsWith('http://') || url.startsWith('https://')) {
@@ -101,7 +110,12 @@ const priceRangeLabel = computed(() => {
 const filteredVariants = computed(() => {
   let list = allVariants.value
   if (priceRangeValue.value < priceMax.value) {
-    list = list.filter(v => v.salePrice <= priceRangeValue.value)
+    list = list.filter(v => {
+      const activePrice = isDiscountActive(v)
+        ? Math.round(v.salePrice * (100 - v.phanTramGiam) / 100)
+        : v.salePrice
+      return activePrice <= priceRangeValue.value
+    })
   }
   return list
 })
@@ -224,6 +238,10 @@ const fetchVariants = async (page = 0) => {
         salePrice: item.giaBan ?? 0,
         isActive: (item.soLuongTon ?? 0) === 0 ? false : (isParentProductInactive(item.maSanPham) ? false : (item.trangThai === 1)),
         image: formatImage(item.anh),
+        phanTramGiam: item.phanTramGiam,
+        ngayBatDau: item.ngayBatDau,
+        ngayKetThuc: item.ngayKetThuc,
+        trangThaiDotGiamGia: item.trangThaiDotGiamGia,
       }))
       totalPages.value = data.totalPages || 1
       totalElements.value = data.totalElements || 0
@@ -837,18 +855,27 @@ onMounted(() => {
                 />
               </td>
               <td class="p-4">{{ (currentPage * pageSize) + idx + 1 }}</td>
-              <td class="p-4">
-                <img
-                  v-if="variant.image"
-                  :src="variant.image"
-                  :alt="variant.variantCode"
-                  class="w-10 h-10 rounded object-cover border border-outline-variant"
-                />
-                <div
-                  v-else
-                  class="w-10 h-10 rounded bg-surface-variant flex items-center justify-center border border-outline-variant"
-                >
-                  <span class="material-symbols-outlined text-on-surface-variant">image</span>
+              <td class="p-4 relative">
+                <div class="relative w-10 h-10">
+                  <img
+                    v-if="variant.image"
+                    :src="variant.image"
+                    :alt="variant.variantCode"
+                    class="w-10 h-10 rounded object-cover border border-outline-variant"
+                  />
+                  <div
+                    v-else
+                    class="w-10 h-10 rounded bg-surface-variant flex items-center justify-center border border-outline-variant"
+                  >
+                    <span class="material-symbols-outlined text-on-surface-variant">image</span>
+                  </div>
+                  <!-- Discount badge -->
+                  <span
+                    v-if="isDiscountActive(variant)"
+                    class="absolute -top-1.5 -left-1.5 bg-[#ef4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm shadow-sm z-10"
+                  >
+                    -{{ variant.phanTramGiam }}%
+                  </span>
                 </div>
               </td>
               <td class="p-4 font-semibold text-primary">{{ variant.productCode }}</td>
@@ -857,7 +884,17 @@ onMounted(() => {
               <td class="p-4">{{ variant.color }}</td>
               <td class="p-4">{{ variant.stock }}</td>
               <td class="p-4">{{ formatPrice(variant.importPrice) }}</td>
-              <td class="p-4 font-semibold">{{ formatPrice(variant.salePrice) }}</td>
+              <td class="p-4 font-semibold">
+                <div v-if="isDiscountActive(variant)" class="flex flex-col">
+                  <span class="text-xs text-gray-400 line-through font-normal">
+                    {{ formatPrice(variant.salePrice) }}
+                  </span>
+                  <span class="text-[#ef4444] font-semibold">
+                    {{ formatPrice(Math.round(variant.salePrice * (100 - variant.phanTramGiam) / 100)) }}
+                  </span>
+                </div>
+                <span v-else>{{ formatPrice(variant.salePrice) }}</span>
+              </td>
               <td class="p-4">
                 <span
                   :class="
@@ -1289,3 +1326,5 @@ onMounted(() => {
   animation: scaleUp 0.15s ease-out forwards;
 }
 </style>
+
+

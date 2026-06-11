@@ -4,6 +4,8 @@ import ProductList from '../views/main/ProductList.vue'
 import ProductVariantList from '../views/main/ProductVariantList.vue'
 import AttributeList from '../views/main/AttributeList.vue'
 import ProductAdd from '../views/main/ProductAdd.vue'
+import DiscountList from '../views/main/DiscountList.vue'
+import DiscountAdd from '../views/main/DiscountAdd.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -38,7 +40,20 @@ const router = createRouter({
       component: AttributeList,
       meta: { layout: 'DashboardLayout' },
     },
+    {
+      path: '/discounts',
+      name: 'discounts',
+      component: DiscountList,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/discounts/create',
+      name: 'discount-create',
+      component: DiscountAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
   ],
 })
 
 export default router
+

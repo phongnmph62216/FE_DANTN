@@ -181,9 +181,11 @@ const fetchProducts = async (page = 0) => {
         brand: sanitizeVietnamese(item.tenThuongHieu || 'Chưa rõ'),
         material: sanitizeVietnamese(item.tenChatLieu || 'Chưa rõ'),
         stock: item.tongTonKho ?? 0,
-        price: item.giaThapNhat === item.giaCaoNhat
-          ? `${formatPrice(item.giaThapNhat)}₫`
-          : `${formatPrice(item.giaThapNhat)}₫ - ${formatPrice(item.giaCaoNhat)}₫`,
+        priceMin: item.giaThapNhat ?? 0,
+        priceMax: item.giaCaoNhat ?? 0,
+        discountedMin: item.giaThapNhatSauGiam ?? item.giaThapNhat ?? 0,
+        discountedMax: item.giaCaoNhatSauGiam ?? item.giaCaoNhat ?? 0,
+        maxDiscountPercent: item.maxPhanTramGiam ?? 0,
         isActive: (item.tongTonKho ?? 0) === 0 ? false : (item.trangThai === 1),
         image: formatImage(item.hinhAnh)
       }))
@@ -892,14 +894,35 @@ onMounted(() => {
                 <td class="px-6 py-4 text-sm font-semibold text-[#EF972D]">{{ product.code }}</td>
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
-                    <img class="w-10 h-10 rounded-md object-cover border border-gray-100" :src="product.image" :alt="product.name" />
+                    <div class="relative w-10 h-10">
+                      <img class="w-10 h-10 rounded-md object-cover border border-gray-100" :src="product.image" :alt="product.name" />
+                      <!-- Discount badge -->
+                      <span
+                        v-if="product.maxDiscountPercent > 0"
+                        class="absolute -top-1.5 -left-1.5 bg-[#ef4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm shadow-sm z-10"
+                      >
+                        -{{ product.maxDiscountPercent }}%
+                      </span>
+                    </div>
                     <span class="text-sm font-medium text-gray-900">{{ product.name }}</span>
                   </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ product.brand }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ product.material }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ product.stock }}</td>
-                <td class="px-6 py-4 text-sm text-right font-medium text-gray-900">{{ product.price }}</td>
+                <td class="px-6 py-4 text-sm text-right font-medium">
+                  <div v-if="product.maxDiscountPercent > 0" class="flex flex-col items-end">
+                    <span class="text-xs text-gray-400 line-through font-normal">
+                      {{ product.priceMin === product.priceMax ? `${formatPrice(product.priceMin)}₫` : `${formatPrice(product.priceMin)}₫ - ${formatPrice(product.priceMax)}₫` }}
+                    </span>
+                    <span class="text-[#ef4444] font-semibold">
+                      {{ product.discountedMin === product.discountedMax ? `${formatPrice(product.discountedMin)}₫` : `${formatPrice(product.discountedMin)}₫ - ${formatPrice(product.discountedMax)}₫` }}
+                    </span>
+                  </div>
+                  <span v-else class="text-gray-900">
+                    {{ product.priceMin === product.priceMax ? `${formatPrice(product.priceMin)}₫` : `${formatPrice(product.priceMin)}₫ - ${formatPrice(product.priceMax)}₫` }}
+                  </span>
+                </td>
                 <td class="px-6 py-4">
                   <span
                     :class="product.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
