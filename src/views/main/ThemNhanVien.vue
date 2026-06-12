@@ -476,7 +476,7 @@ const chonAnh = (event) => {
   previewImage.value = URL.createObjectURL(file);
 };
 
-import NhanVienApi from "@/services/NhanVienAPI";
+import NhanVienApi from "@/services/NhanVienApi";
 import { useRouter } from "vue-router";
 
 const router = useRouter();

@@ -301,7 +301,7 @@ const isActiveRoute = (path) => {
           >
             <div :class="!sidebarExpanded && 'justify-center w-full'" class="flex items-center gap-3">
               <span class="material-symbols-outlined group-hover:scale-110 transition-transform">calendar_today</span>
-              <span class="font-body-md text-body-md whitespace-nowrap" v-show="sidebarExpanded">Lịch làm việc</span>
+              <span class="font-body-md text-body-md whitespace-nowrap" v-show="sidebarExpanded">Quản lý lịch làm việc</span>
             </div>
             <span
               :class="menuStates.schedules ? 'rotate-180' : ''"
@@ -311,7 +311,19 @@ const isActiveRoute = (path) => {
           </button>
           <div class="pl-11 pr-4 py-1 flex flex-col gap-1" v-show="menuStates.schedules && sidebarExpanded">
             <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Lịch làm việc</a>
-            <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Ca làm việc</a>
+            <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Lịch của tôi</a>
+            
+            <RouterLink
+  to="/ca-lam-viec"
+  class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+  :class="isActiveRoute('/ca-lam-viec')
+    ? 'text-[#EF972D] font-semibold'
+    : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+>
+  Ca làm việc
+</RouterLink>
+
+            <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Giao ca và kiểm toán</a>
             <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Lịch sử hoạt động</a>
           </div>
         </li>

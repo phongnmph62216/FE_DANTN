@@ -5,6 +5,7 @@ import AttributeList from '../views/main/AttributeList.vue'
 import NhanVienList from '@/views/main/NhanVienList.vue'
 import ThemNhanVien from '@/views/main/ThemNhanVien.vue'
 import SuaNhanVien from '@/views/main/SuaNhanVien.vue'
+import CaLamViecList from '@/views/main/lichlamviec/CaLamViecList.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -43,6 +44,12 @@ const router = createRouter({
       path: '/sua-nhan-vien/:id',
       name: 'sua-nhan-vien',
       component: SuaNhanVien,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/ca-lam-viec',
+      name: 'ca-lam-viec',
+      component: CaLamViecList,
       meta: { layout: 'DashboardLayout' },
     },
     
