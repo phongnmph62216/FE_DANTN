@@ -6,6 +6,8 @@ import AttributeList from '../views/main/AttributeList.vue'
 import ProductAdd from '../views/main/ProductAdd.vue'
 import DiscountList from '../views/main/DiscountList.vue'
 import DiscountAdd from '../views/main/DiscountAdd.vue'
+import CustomerList from '../views/main/CustomerList.vue'
+import CustomerAdd from '../views/main/CustomerAdd.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -56,6 +58,24 @@ const router = createRouter({
       path: '/discounts/edit/:id',
       name: 'discount-edit',
       component: DiscountAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/customers',
+      name: 'customers',
+      component: CustomerList,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/customers/create',
+      name: 'customer-create',
+      component: CustomerAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/customers/edit/:id',
+      name: 'customer-edit',
+      component: CustomerAdd,
       meta: { layout: 'DashboardLayout' },
     },
   ],
