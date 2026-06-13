@@ -10,6 +10,8 @@ import CustomerList from '../views/main/CustomerList.vue'
 import CustomerAdd from '../views/main/CustomerAdd.vue'
 import VoucherList from '../views/main/VoucherList.vue'
 import VoucherAdd from '../views/main/VoucherAdd.vue'
+import EmployeeList from '../views/main/EmployeeList.vue'
+import EmployeeAdd from '../views/main/EmployeeAdd.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,6 +31,12 @@ const router = createRouter({
     {
       path: '/products/create',
       name: 'product-create',
+      component: ProductAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/products/add',
+      name: 'product-add',
       component: ProductAdd,
       meta: { layout: 'DashboardLayout' },
     },
@@ -57,6 +65,12 @@ const router = createRouter({
       meta: { layout: 'DashboardLayout' },
     },
     {
+      path: '/vouchers/add',
+      name: 'voucher-add',
+      component: VoucherAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
       path: '/vouchers/edit/:id',
       name: 'voucher-edit',
       component: VoucherAdd,
@@ -71,6 +85,12 @@ const router = createRouter({
     {
       path: '/discounts/create',
       name: 'discount-create',
+      component: DiscountAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/discounts/add',
+      name: 'discount-add',
       component: DiscountAdd,
       meta: { layout: 'DashboardLayout' },
     },
@@ -98,8 +118,25 @@ const router = createRouter({
       component: CustomerAdd,
       meta: { layout: 'DashboardLayout' },
     },
+    {
+      path: '/employees',
+      name: 'employees',
+      component: EmployeeList,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/employees/create',
+      name: 'employee-create',
+      component: EmployeeAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/employees/edit/:id',
+      name: 'employee-edit',
+      component: EmployeeAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
   ],
 })
 
 export default router
-
