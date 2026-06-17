@@ -73,28 +73,39 @@ const formatDate = (dateString) => {
   }
 }
 
-// Get dynamic display status details
 const getStatusBadge = (item) => {
-  if (item.trangThai === 0) {
-    return {
-      text: 'Sắp diễn ra',
-      class: 'bg-blue-50 text-blue-700 border border-blue-100'
-    }
-  } else if (item.trangThai === 1) {
-    return {
-      text: 'Đang diễn ra',
-      class: 'bg-green-50 text-green-700 border border-green-100'
-    }
-  } else if (item.trangThai === 2) {
+  if (item.trangThai === 2) {
     return {
       text: 'Đã kết thúc',
       class: 'bg-gray-100 text-gray-500 border border-gray-200'
     }
   }
-  return {
-    text: 'Không xác định',
-    class: 'bg-gray-50 text-gray-400'
+
+  const now = new Date()
+  const start = new Date(item.ngayBatDau)
+  const end = new Date(item.ngayKetThuc)
+
+  if (now < start) {
+    return {
+      text: 'Sắp diễn ra',
+      class: 'bg-blue-50 text-blue-700 border border-blue-100'
+    }
+  } else if (now > end) {
+    return {
+      text: 'Đã kết thúc',
+      class: 'bg-gray-100 text-gray-500 border border-gray-200'
+    }
+  } else {
+    return {
+      text: 'Đang diễn ra',
+      class: 'bg-green-50 text-green-700 border border-green-100'
+    }
   }
+}
+
+const isExpired = (item) => {
+  if (!item.ngayKetThuc) return false
+  return new Date(item.ngayKetThuc) < new Date()
 }
 
 // Main API fetcher
@@ -185,6 +196,10 @@ const resetFilters = () => {
 
 // Toggle status handler
 const handleToggle = (item) => {
+  if (isExpired(item)) {
+    showToast('Phiếu giảm giá đã hết thời gian áp dụng, không thể thay đổi trạng thái. Vui lòng sửa lại thời hạn!', 'error')
+    return
+  }
   const oldState = item.trangThai
   let actionText = ''
 
@@ -455,19 +470,21 @@ onMounted(() => {
               <td class="py-4 px-4 text-right">
                 <div class="flex items-center justify-end gap-3">
                   <!-- Toggle Switch -->
-                  <div class="relative inline-block w-10 mr-2 align-middle select-none">
-                    <input
-                      :id="'toggle-' + item.id"
-                      :checked="item.trangThai === 1"
-                      @change="handleToggle(item)"
-                      class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer opacity-0"
-                      type="checkbox"
-                    />
-                    <label
-                      :for="'toggle-' + item.id"
-                      class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"
-                    ></label>
-                  </div>
+                  <button
+                    @click="handleToggle(item)"
+                    :class="[
+                      (item.trangThai === 0 || item.trangThai === 1) ? 'bg-red-500' : 'bg-gray-300',
+                      isExpired(item) ? 'opacity-60 !cursor-not-allowed' : 'cursor-pointer'
+                    ]"
+                    class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none mr-2"
+                    role="switch"
+                    :aria-checked="(item.trangThai === 0 || item.trangThai === 1) ? 'true' : 'false'"
+                  >
+                    <span
+                      :class="(item.trangThai === 0 || item.trangThai === 1) ? 'translate-x-5' : 'translate-x-1'"
+                      class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform"
+                    ></span>
+                  </button>
 
                   <!-- Edit Action -->
                   <button
@@ -571,13 +588,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.toggle-checkbox:checked { right: 0; border-color: #EF4444; }
-.toggle-checkbox:checked + .toggle-label { background-color: #EF4444; }
-.toggle-checkbox { right: 0; z-index: 1; border-color: #e2e8f0; transition: all 0.3s; }
-.toggle-label { width: 2.5rem; height: 1.25rem; background-color: #cbd5e1; border-radius: 9999px; cursor: pointer; transition: all 0.3s; position: relative; display: block; }
-.toggle-label::after { content: ''; position: absolute; top: 0.125rem; left: 0.125rem; width: 1rem; height: 1rem; background-color: white; border-radius: 50%; transition: all 0.3s; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-.toggle-checkbox:checked + .toggle-label::after { transform: translateX(1.25rem); }
-
 /* Custom Date input picker indicator styles */
 input[type="date"]::-webkit-calendar-picker-indicator {
   background: transparent;

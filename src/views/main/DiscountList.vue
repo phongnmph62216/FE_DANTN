@@ -93,6 +93,11 @@ const getStatusBadge = (item) => {
   }
 }
 
+const isExpired = (item) => {
+  if (!item.ngayKetThuc) return false
+  return new Date(item.ngayKetThuc) < new Date()
+}
+
 // Main API fetcher
 const fetchSales = async (page = 0) => {
   isLoading.value = true
@@ -189,6 +194,10 @@ const resetFilters = () => {
 
 // Toggle status handler
 const handleToggle = (item) => {
+  if (isExpired(item)) {
+    showToast('Đợt giảm giá đã hết thời gian áp dụng, không thể thay đổi trạng thái. Vui lòng sửa lại thời hạn!', 'error')
+    return
+  }
   const oldState = item.trangThai
   const newState = oldState === 1 ? 0 : 1
 
@@ -412,8 +421,11 @@ onMounted(() => {
               <button
                 @click="handleToggle(item)"
                 :aria-checked="item.trangThai === 1 ? 'true' : 'false'"
-                :class="item.trangThai === 1 ? 'bg-error' : 'bg-outline-variant'"
-                class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none cursor-pointer"
+                :class="[
+                  item.trangThai === 1 ? 'bg-error' : 'bg-outline-variant',
+                  isExpired(item) ? 'opacity-60 !cursor-not-allowed' : 'cursor-pointer'
+                ]"
+                class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none"
                 role="switch"
               >
                 <span
