@@ -12,6 +12,8 @@ import VoucherList from '../views/main/VoucherList.vue'
 import VoucherAdd from '../views/main/VoucherAdd.vue'
 import EmployeeList from '../views/main/EmployeeList.vue'
 import EmployeeAdd from '../views/main/EmployeeAdd.vue'
+import InvoiceList from '../views/main/InvoiceList.vue'
+import InvoiceDetail from '../views/main/InvoiceDetail.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -134,6 +136,18 @@ const router = createRouter({
       path: '/employees/edit/:id',
       name: 'employee-edit',
       component: EmployeeAdd,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/invoices',
+      name: 'invoices',
+      component: InvoiceList,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/invoices/:id',
+      name: 'invoice-detail',
+      component: InvoiceDetail,
       meta: { layout: 'DashboardLayout' },
     },
   ],
