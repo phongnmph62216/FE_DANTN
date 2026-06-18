@@ -14,6 +14,7 @@ import EmployeeList from '../views/main/EmployeeList.vue'
 import EmployeeAdd from '../views/main/EmployeeAdd.vue'
 import InvoiceList from '../views/main/InvoiceList.vue'
 import InvoiceDetail from '../views/main/InvoiceDetail.vue'
+import POSManagement from '../views/main/POSManagement.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -148,6 +149,12 @@ const router = createRouter({
       path: '/invoices/:id',
       name: 'invoice-detail',
       component: InvoiceDetail,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/pos',
+      name: 'pos',
+      component: POSManagement,
       meta: { layout: 'DashboardLayout' },
     },
   ],

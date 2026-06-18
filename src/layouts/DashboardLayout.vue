@@ -84,16 +84,16 @@ const isActiveRoute = (path) => {
 
         <!-- Bán hàng -->
         <li>
-          <a
+          <RouterLink
+            to="/pos"
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
-            class="flex items-center justify-between py-3 text-surface-variant/80 hover:bg-surface-variant/10 hover:text-surface-bright rounded-lg transition-colors group cursor-pointer"
-            href="#"
+            class="flex items-center gap-3 py-3 rounded-lg font-bold transition-all shadow-sm"
+            :style="isActiveRoute('/pos') ? 'background-image: linear-gradient(to right, #FFB74D, #EF972D); color: #ffffff;' : 'color: rgba(211, 228, 254, 0.8);'"
+            :class-active="isActiveRoute('/pos') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
           >
-            <div :class="!sidebarExpanded && 'justify-center w-full'" class="flex items-center gap-3">
-              <span class="material-symbols-outlined group-hover:scale-110 transition-transform">payments</span>
-              <span class="font-body-md text-body-md whitespace-nowrap" v-show="sidebarExpanded">Bán hàng</span>
-            </div>
-          </a>
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">payments</span>
+            <span class="font-body-md text-body-md font-semibold whitespace-nowrap" v-show="sidebarExpanded">Bán hàng</span>
+          </RouterLink>
         </li>
 
         <!-- Collapsible Section -->

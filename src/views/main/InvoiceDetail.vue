@@ -65,10 +65,10 @@ const getStatusText = (status) => {
   }
 }
 
-// Getters with Fallbacks
+// Getters with Fallbacks matching DTO flat properties
 const getInvoiceCode = computed(() => {
   if (!detail.value) return ''
-  return detail.value.maHoaDon || detail.value.ma || 'HD00007'
+  return detail.value.maHoaDon || detail.value.ma || 'HD001'
 })
 
 const getOrderType = computed(() => {
@@ -90,7 +90,7 @@ const getCreatedDate = computed(() => {
 
 const getEmployeeName = computed(() => {
   if (!detail.value) return ''
-  return detail.value.tenNhanVien || detail.value.thongTinChung?.tenNhanVien || detail.value.nhanVien || 'Hệ thống'
+  return detail.value.nguoiTao || detail.value.tenNhanVien || detail.value.nhanVien || 'Hệ thống'
 })
 
 // Customer Info
@@ -112,7 +112,7 @@ const getCustomerEmail = computed(() => {
 // Delivery Info
 const getDeliveryAddress = computed(() => {
   if (!detail.value) return '—'
-  return detail.value.diaChiGiaoHang || detail.value.thongTinKhachHang?.diaChiGiaoHang || detail.value.diaChi || '—'
+  return detail.value.diaChi || detail.value.diaChiGiaoHang || detail.value.thongTinKhachHang?.diaChiGiaoHang || '—'
 })
 
 const getInvoiceNote = computed(() => {
@@ -123,22 +123,22 @@ const getInvoiceNote = computed(() => {
 // Financial Info
 const getGoodsTotal = computed(() => {
   if (!detail.value) return 0
-  return detail.value.tongTien || detail.value.thongTinTien?.tongTien || detail.value.tongTienHang || 0
+  return detail.value.tongTienHang !== undefined ? detail.value.tongTienHang : (detail.value.tongTien || detail.value.thongTinTien?.tongTien || 0)
 })
 
 const getShipFee = computed(() => {
   if (!detail.value) return 0
-  return detail.value.phiVanChuyen || detail.value.thongTinTien?.phiVanChuyen || detail.value.phiShip || 0
+  return detail.value.phiVanChuyen !== undefined ? detail.value.phiVanChuyen : (detail.value.thongTinTien?.phiVanChuyen || 0)
 })
 
 const getDiscountAmount = computed(() => {
   if (!detail.value) return 0
-  return detail.value.tienGiam || detail.value.thongTinTien?.tienGiam || detail.value.giamGia || detail.value.tienGiamGia || 0
+  return detail.value.giamGia !== undefined ? detail.value.giamGia : (detail.value.tienGiam || detail.value.thongTinTien?.tienGiam || 0)
 })
 
 const getPayableTotal = computed(() => {
   if (!detail.value) return 0
-  return detail.value.thanhTien || detail.value.thongTinTien?.thanhTien || detail.value.tongTienThanhToan || detail.value.thucThu || 0
+  return detail.value.tongTien !== undefined ? detail.value.tongTien : (detail.value.thanhTien || detail.value.thongTinTien?.thanhTien || 0)
 })
 
 const getPaymentMethod = computed(() => {
@@ -154,17 +154,30 @@ const getProducts = computed(() => {
   return detail.value.danhSachSanPham || detail.value.sanPhams || detail.value.hoaDonChiTiets || []
 })
 
-// Timeline logs computation helpers
+// Timeline logs computation helpers with smart DTO merging
 const getStepLog = (stepStatus) => {
-  if (!historyLogs.value || historyLogs.value.length === 0) return null
-  
-  // Find log matching the targeted new state
-  const log = historyLogs.value.find(l => parseInt(l.trangThaiMoi, 10) === stepStatus)
-  if (log) return log
-  
-  // Fallback for step 0 (Chưa xác nhận) if not explicitly present in history
-  if (stepStatus === 0 && historyLogs.value.length > 0) {
-    return historyLogs.value[historyLogs.value.length - 1] // Return oldest log
+  // 1. Check historyLogs from /lich-su (which has full operator information)
+  if (historyLogs.value && historyLogs.value.length > 0) {
+    const log = historyLogs.value.find(l => parseInt(l.trangThai !== undefined ? l.trangThai : l.trangThaiMoi, 10) === stepStatus)
+    if (log) {
+      return {
+        ngayTao: log.thoiGian || log.ngayTao || log.createdAt,
+        nguoiThaoTac: log.nguoiThucHien || log.nguoiThaoTac || log.nguoiTao || 'Nhân viên',
+        ghiChu: log.ghiChu || log.notes || ''
+      }
+    }
+  }
+
+  // 2. Check detail.value.timelineTrangThai from detail DTO
+  if (detail.value && detail.value.timelineTrangThai) {
+    const tl = detail.value.timelineTrangThai.find(t => parseInt(t.trangThai, 10) === stepStatus)
+    if (tl) {
+      return {
+        ngayTao: tl.thoiGian,
+        nguoiThaoTac: detail.value.nguoiSua || detail.value.nguoiTao || 'Nhân viên',
+        ghiChu: tl.ghiChu || ''
+      }
+    }
   }
   return null
 }
@@ -173,11 +186,13 @@ const isStepCompleted = (stepStatus) => {
   const currentStatus = getStatus.value
   if (currentStatus === 5) {
     // If canceled, only show steps completed before cancellation
-    const cancelLog = historyLogs.value.find(l => parseInt(l.trangThaiMoi, 10) === 5)
+    const cancelLog = historyLogs.value.find(l => parseInt(l.trangThai !== undefined ? l.trangThai : l.trangThaiMoi, 10) === 5)
     if (cancelLog) {
       const stepLog = getStepLog(stepStatus)
       if (stepLog) {
-        return new Date(stepLog.ngayTao || stepLog.createdAt) <= new Date(cancelLog.ngayTao || cancelLog.createdAt)
+        const cancelTime = cancelLog.thoiGian || cancelLog.ngayTao || cancelLog.createdAt
+        const stepTime = stepLog.ngayTao || stepLog.createdAt
+        return new Date(stepTime) <= new Date(cancelTime)
       }
     }
     return false
@@ -504,6 +519,17 @@ onMounted(() => {
               - {{ formatPriceVND(getDiscountAmount) }}
             </span>
           </div>
+          <!-- Applied Voucher Coupon Details -->
+          <div v-if="detail && detail.maPhieuGiamGia" class="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-lg p-2.5 text-xs text-orange-800 my-1">
+            <span class="flex items-center gap-1 font-semibold">
+              <span class="material-symbols-outlined text-sm" style="font-size: 16px; font-variation-settings: 'FILL' 1;">local_activity</span>
+              Mã giảm giá:
+            </span>
+            <span class="font-bold text-right">
+              {{ detail.maPhieuGiamGia }}
+              <span v-if="detail.tenPhieuGiamGia" class="font-normal block text-[10px] text-orange-600">{{ detail.tenPhieuGiamGia }}</span>
+            </span>
+          </div>
           <div class="flex justify-between items-center" v-if="getOrderType === 1">
             <span class="font-body-md text-body-md text-on-surface-variant">Phí vận chuyển</span>
             <span class="font-body-md text-body-md text-on-background font-medium">
@@ -578,16 +604,26 @@ onMounted(() => {
           <span class="material-symbols-outlined text-secondary">history</span>
           <h2 class="font-headline-md text-headline-md text-on-background">Lịch sử thanh toán</h2>
         </div>
-        <div class="flex justify-between items-start mt-2">
-          <span class="font-body-md text-body-md text-on-background font-semibold">{{ getPaymentMethod }}</span>
+        <div
+          v-for="(pay, idx) in detail.lichSuThanhToan || []"
+          :key="idx"
+          class="flex justify-between items-start mt-2 border-b border-surface-container-high/30 pb-2 last:border-b-0 last:pb-0"
+        >
+          <span class="font-body-md text-body-md text-on-background font-semibold">{{ pay.phuongThuc }}</span>
           <div class="text-right">
             <span class="font-body-md text-body-md text-primary-container font-bold block">
-              {{ formatPriceVND(getPayableTotal) }}
+              {{ formatPriceVND(pay.soTien) }}
             </span>
             <span class="font-body-md text-body-md text-on-surface-variant text-xs mt-1 block">
-              {{ formatDateTime(getCreatedDate).split(' ')[0] }} • {{ getEmployeeName }}
+              {{ formatDateTime(pay.thoiGian) }} • {{ pay.nguoiThucHien }}
+            </span>
+            <span v-if="pay.ghiChu" class="text-[11px] text-gray-400 italic block mt-0.5">
+              "{{ pay.ghiChu }}"
             </span>
           </div>
+        </div>
+        <div v-if="!(detail.lichSuThanhToan && detail.lichSuThanhToan.length)" class="text-center py-4 text-xs text-on-surface-variant">
+          Chưa có lịch sử thanh toán.
         </div>
       </div>
 
@@ -758,8 +794,8 @@ onMounted(() => {
         <!-- Vertical timeline component -->
         <div class="relative pl-6 border-l-2 border-gray-200 space-y-6 py-2">
           <div
-            v-for="log in historyLogs"
-            :key="log.id"
+            v-for="(log, idx) in historyLogs"
+            :key="idx"
             class="relative"
           >
             <!-- Timeline Dot indicator -->
@@ -767,13 +803,13 @@ onMounted(() => {
             
             <div class="flex flex-col">
               <span class="text-sm font-bold text-on-surface leading-tight">
-                {{ log.hanhDong || getStatusText(log.trangThaiMoi) || 'Cập nhật trạng thái' }}
+                {{ log.hanhDong || getStatusText(log.trangThai) || 'Cập nhật trạng thái' }}
               </span>
               <span class="text-xs text-on-surface-variant mt-1">
-                Thời gian: <span class="font-semibold text-on-surface">{{ formatDateTime(log.ngayTao || log.createdAt) }}</span>
+                Thời gian: <span class="font-semibold text-on-surface">{{ formatDateTime(log.thoiGian || log.ngayTao || log.createdAt) }}</span>
               </span>
               <span class="text-xs text-on-surface-variant mt-0.5">
-                Người thực hiện: <span class="font-semibold text-on-surface">{{ log.nguoiThaoTac || log.nguoiTao || 'Hệ thống' }}</span>
+                Người thực hiện: <span class="font-semibold text-on-surface">{{ log.nguoiThucHien || log.nguoiThaoTac || log.nguoiTao || 'Hệ thống' }}</span>
               </span>
               
               <!-- Remark box -->
