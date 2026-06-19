@@ -59,7 +59,7 @@ const getMockOrders = () => {
             stock: 15
           }
         ],
-        loaiHoaDon: 1, // 1: Tại quầy, 2: Giao hàng
+        loaiHoaDon: 0, // 0: Tại quầy, 1: Giao hàng
         trangThai: 0,
         phiVanChuyen: 0,
         diaChiGiao: '',
@@ -180,7 +180,7 @@ const calculatePrices = (order) => {
   }
 
   order.soTienGiam = discount
-  order.tongTienThanhToan = Math.max(0, subtotal - discount + (order.loaiHoaDon === 2 ? Number(order.phiVanChuyen || 0) : 0))
+  order.tongTienThanhToan = Math.max(0, subtotal - discount + (order.loaiHoaDon === 1 ? Number(order.phiVanChuyen || 0) : 0))
 }
 
 // ---------------- ADRESS / LOCATION APIS ----------------
@@ -528,7 +528,7 @@ const loadOrders = async () => {
           stock: item.chiTietSanPham?.soLuongTon ?? 999,
           isLoading: false
         })),
-        loaiHoaDon: order.loaiHoaDon ?? 1,
+        loaiHoaDon: order.loaiHoaDon ?? 0,
         trangThai: order.trangThai || 0,
         phiVanChuyen: order.phiVanChuyen || 0,
         diaChiGiao: order.diaChiGiao || '',
@@ -551,7 +551,10 @@ const loadOrders = async () => {
         khachThanhToan: order.khachThanhToan || 0
       }))
       isUsingMock.value = false
-      if (orders.value.length > 0) {
+      const currentActiveId = activeOrderId.value
+      if (currentActiveId && orders.value.some(o => o.id === currentActiveId)) {
+        activeOrderId.value = currentActiveId
+      } else if (orders.value.length > 0) {
         activeOrderId.value = orders.value[0].id
       } else {
         activeOrderId.value = null
@@ -561,7 +564,10 @@ const loadOrders = async () => {
     console.warn('POS API failed. Falling back to local storage mock data.', err.message)
     isUsingMock.value = true
     orders.value = getMockOrders()
-    if (orders.value.length > 0) {
+    const currentActiveId = activeOrderId.value
+    if (currentActiveId && orders.value.some(o => o.id === currentActiveId)) {
+      activeOrderId.value = currentActiveId
+    } else if (orders.value.length > 0) {
       activeOrderId.value = orders.value[0].id
     } else {
       activeOrderId.value = null
@@ -603,7 +609,7 @@ const fetchOrderDetail = async (orderId) => {
               isLoading: false
             }
           }),
-          loaiHoaDon: order.loaiHoaDon ?? 1,
+          loaiHoaDon: order.loaiHoaDon ?? 0,
           trangThai: order.trangThai || 0,
           phiVanChuyen: order.phiVanChuyen || 0,
           diaChiGiao: order.diaChiGiao || '',
@@ -622,8 +628,8 @@ const fetchOrderDetail = async (orderId) => {
             : null,
           soTienGoc: (order.chiTietDonHang || []).reduce((sum, item) => sum + (item.donGia * item.soLuong), 0),
           soTienGiam: order.soTienGiam || 0,
-          tongTienThanhToan: order.tongTien || 0,
-          khachThanhToan: order.khachThanhToan || order.tongTien || 0
+          tongTienThanhToan: order.tongTienThanhToan ?? order.tongTien ?? 0,
+          khachThanhToan: order.khachThanhToan || order.tongTienThanhToan || order.tongTien || 0
         }
       }
     }
@@ -650,7 +656,7 @@ const createNewOrder = async () => {
         soDienThoai: '',
         khachHang: null,
         chiTietList: [],
-        loaiHoaDon: 1,
+        loaiHoaDon: 0,
         trangThai: 0,
         phiVanChuyen: 0,
         diaChiGiao: '',
@@ -670,7 +676,7 @@ const createNewOrder = async () => {
       activeOrderId.value = nextId
       showToast('Đã tạo đơn hàng chờ mới (Mock)!', 'success')
     } else {
-      const res = await api.post('/api/v1/ban-hang/tao-don-hang')
+      const res = await api.post('/api/v1/ban-hang/tao-don')
       if (res.data) {
         showToast('Tạo đơn hàng chờ thành công!', 'success')
         await loadOrders()
@@ -699,9 +705,8 @@ const closeOrderTab = (order) => {
         showToast('Đã hủy đơn hàng chờ (Mock)!', 'success')
       } else {
         try {
-          await api.patch(`/api/v1/hoa-don/${order.id}/trang-thai`, {
-            trangThai: 5, // 5 represents "Đã hủy" (Cancelled) in backend
-            hanhDong: 'Hủy đơn hàng',
+          await api.put(`/api/v1/hoa-don/${order.id}/trang-thai`, {
+            trangThaiMoi: 5, // 5 represents "Đã hủy" (Cancelled) in backend
             ghiChu: 'Hủy đơn hàng chờ từ màn hình POS'
           })
           showToast('Đã hủy đơn hàng chờ thành công!', 'success')
@@ -1332,15 +1337,15 @@ const removeAppliedVoucher = async () => {
 // ---------------- DELIVERY CONFIG ----------------
 const handleDeliveryToggle = () => {
   if (!currentOrder.value) return
-  if (currentOrder.value.loaiHoaDon === 1) {
-    currentOrder.value.loaiHoaDon = 2 // Giao hàng
+  if (currentOrder.value.loaiHoaDon === 0) {
+    currentOrder.value.loaiHoaDon = 1 // Giao hàng
     // Setup initial fields from customer bound
     if (currentOrder.value.khachHang) {
       currentOrder.value.tenNguoiNhan = currentOrder.value.khachHang.hoTen
       currentOrder.value.sdtNguoiNhan = currentOrder.value.khachHang.sdt
     }
   } else {
-    currentOrder.value.loaiHoaDon = 1 // Tại quầy
+    currentOrder.value.loaiHoaDon = 0 // Tại quầy
     currentOrder.value.phiVanChuyen = 0
   }
   calculatePrices(currentOrder.value)
@@ -1432,7 +1437,7 @@ const printReceiptWindow = (order) => {
       </div>
       <div class="box">
         <div class="box-title">Thông tin hóa đơn</div>
-        <div class="row"><div class="label">Hình thức</div><div class="value">${order.loaiHoaDon === 2 ? 'Giao hàng' : 'Mua tại quầy'}</div></div>
+        <div class="row"><div class="label">Hình thức</div><div class="value">${order.loaiHoaDon === 1 ? 'Giao hàng' : 'Mua tại quầy'}</div></div>
         <div class="row"><div class="label">Ngày tạo</div><div class="value">${new Date().toLocaleString()}</div></div>
         <div class="row"><div class="label">Người lập</div><div class="value">Nguyễn Hoàng Admin</div></div>
       </div>
@@ -1517,17 +1522,17 @@ const executeCheckout = async (order, paymentData) => {
       showPaymentModal.value = false
     } else {
       // 1. Update recipient / delivery details
-      const diaChiFull = order.loaiHoaDon === 2 
+      const diaChiFull = order.loaiHoaDon === 1 
         ? `${order.diaChiGiao}, ${order.phuongXa}, ${order.quanHuyen}, ${order.tinhThanhPho}`
         : null;
 
       await api.put(`/api/v1/ban-hang/${order.id}/thong-tin-nhan-hang`, {
         idKhachHang: order.khachHang?.id || null,
-        isGiaoHang: order.loaiHoaDon === 2,
-        tenNguoiNhan: order.loaiHoaDon === 2 ? order.tenNguoiNhan : null,
-        sdtNguoiNhan: order.loaiHoaDon === 2 ? order.sdtNguoiNhan : null,
+        isGiaoHang: order.loaiHoaDon === 1,
+        tenNguoiNhan: order.loaiHoaDon === 1 ? order.tenNguoiNhan : null,
+        sdtNguoiNhan: order.loaiHoaDon === 1 ? order.sdtNguoiNhan : null,
         diaChiChiTiet: diaChiFull,
-        phiVanChuyen: order.loaiHoaDon === 2 ? Number(order.phiVanChuyen || 0) : 0
+        phiVanChuyen: order.loaiHoaDon === 1 ? Number(order.phiVanChuyen || 0) : 0
       })
 
       // 2. Perform checkout / payment
@@ -1571,7 +1576,7 @@ const confirmCheckoutOrder = () => {
     return
   }
 
-  if (order.loaiHoaDon === 2) { // Shipping validation
+  if (order.loaiHoaDon === 1) { // Shipping validation
     if (!order.tenNguoiNhan || !order.sdtNguoiNhan || !order.diaChiGiao || !order.tinhThanhPho || !order.quanHuyen || !order.phuongXa) {
       showToast('Vui lòng nhập đầy đủ thông tin giao hàng (Người nhận, SĐT, Địa chỉ chi tiết, Tỉnh/Thành, Quận/Huyện, Phường/Xã)!', 'error')
       return
@@ -1790,7 +1795,7 @@ onUnmounted(async () => {
                 </div>
 
                 <!-- Shipping Address details (if shipping toggled) -->
-                <div class="space-y-4 pt-2 border-t border-gray-100" v-show="currentOrder.loaiHoaDon === 2">
+                <div class="space-y-4 pt-2 border-t border-gray-100" v-show="currentOrder.loaiHoaDon === 1">
                   <h3 class="text-sm font-bold text-gray-700">Địa chỉ nhận hàng</h3>
                   <div class="flex flex-col gap-1.5">
                     <label class="text-xs font-semibold text-gray-600">Họ và tên người nhận</label>
@@ -1895,17 +1900,17 @@ onUnmounted(async () => {
               <div class="flex items-center justify-between">
                 <h2 class="text-lg font-bold text-[#0D2533]">Thông tin thanh toán</h2>
                 <div class="flex items-center gap-3">
-                  <span class="text-sm font-semibold text-gray-600">{{ currentOrder?.loaiHoaDon === 2 ? 'Giao hàng' : 'Tại quầy' }}</span>
+                  <span class="text-sm font-semibold text-gray-600">{{ currentOrder?.loaiHoaDon === 1 ? 'Giao hàng' : 'Tại quầy' }}</span>
                   
                   <button
                     @click="handleDeliveryToggle"
-                    :aria-checked="currentOrder.loaiHoaDon === 2 ? 'true' : 'false'"
-                    :class="currentOrder.loaiHoaDon === 2 ? 'bg-emerald-500' : 'bg-gray-300'"
+                    :aria-checked="currentOrder.loaiHoaDon === 1 ? 'true' : 'false'"
+                    :class="currentOrder.loaiHoaDon === 1 ? 'bg-emerald-500' : 'bg-gray-300'"
                     class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer"
                     role="switch"
                   >
                     <span
-                      :class="currentOrder.loaiHoaDon === 2 ? 'translate-x-6' : 'translate-x-1'"
+                      :class="currentOrder.loaiHoaDon === 1 ? 'translate-x-6' : 'translate-x-1'"
                       class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"
                     ></span>
                   </button>
@@ -1953,7 +1958,7 @@ onUnmounted(async () => {
                 </div>
 
                 <!-- Warnings/Notifications -->
-                <div class="p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-2 text-red-700 text-sm" v-if="currentOrder.loaiHoaDon === 2 && !currentOrder.phuongXa">
+                <div class="p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-2 text-red-700 text-sm" v-if="currentOrder.loaiHoaDon === 1 && !currentOrder.phuongXa">
                   <span class="material-symbols-outlined text-sm">warning</span> Chưa đủ thông tin địa chỉ nhận để tính phí vận chuyển GHN.
                 </div>
 
@@ -1963,7 +1968,7 @@ onUnmounted(async () => {
                     <span>Tiền hàng</span>
                     <span class="font-semibold">{{ formatCurrency(currentOrder.soTienGoc) }}</span>
                   </div>
-                  <div class="flex justify-between text-sm text-gray-700" v-if="currentOrder.loaiHoaDon === 2">
+                  <div class="flex justify-between text-sm text-gray-700" v-if="currentOrder.loaiHoaDon === 1">
                     <span>Phí vận chuyển (GHN)</span>
                     <span class="font-semibold">{{ formatCurrency(currentOrder.phiVanChuyen) }}</span>
                   </div>
