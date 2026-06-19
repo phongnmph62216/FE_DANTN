@@ -111,6 +111,22 @@ const customerSearchQuery = ref('')
 const customerList = ref([])
 const isCustomerLoading = ref(false)
 
+// ---------------- CUSTOMER ADDRESS BOOK STATE ----------------
+const showAddressBookModal = ref(false)
+const addressBookCustomer = ref(null)
+const addressBookList = ref([])
+const addressBookDistricts = ref([])
+const addressBookWards = ref([])
+const newAddressForm = ref({
+  tenNguoiNhan: '',
+  sdtNguoiNhan: '',
+  diaChiCuThe: '',
+  tinhThanhPho: '',
+  quanHuyen: '',
+  phuongXa: '',
+  kieuDiaChiLaMacDinh: false
+})
+
 // ---------------- ADRESS SELECTION STATE (GHN) ----------------
 const provinces = ref([])
 const districts = ref([])
@@ -119,12 +135,22 @@ const isGHNCalculated = ref(false)
 
 // ---------------- PAYMENT MODAL STATE ----------------
 const showPaymentModal = ref(false)
+const showCheckoutConfirmModal = ref(false)
 
 // Helper formatting utilities
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
     .format(value || 0)
     .replace(/\s?₫/, ' đ')
+}
+
+const isDiscountActive = (v) => {
+  if (!v || !v.phanTramGiam || v.trangThaiDotGiamGia !== 1) return false
+  if (!v.ngayBatDau || !v.ngayKetThuc) return false
+  const now = new Date()
+  const start = new Date(v.ngayBatDau)
+  const end = new Date(v.ngayKetThuc)
+  return now >= start && now <= end
 }
 
 const sanitizeVietnamese = (text) => {
@@ -200,6 +226,8 @@ const fetchProvinces = async () => {
         code: p.ProvinceID
       })).sort((a, b) => a.name.localeCompare(b.name))
       return
+    } else {
+      throw new Error(json.message || 'GHN API returned error code ' + json.code)
     }
   } catch (err) {
     console.warn('Failed to fetch GHN provinces, falling back to open-api.vn:', err)
@@ -211,6 +239,98 @@ const fetchProvinces = async () => {
     provinces.value = data || []
   } catch (err) {
     console.error('Failed to fetch provinces:', err)
+  }
+}
+
+const normalizeLocationName = (name) => {
+  if (!name) return ''
+  return name
+    .toLowerCase()
+    .replace(/^(tỉnh|thành phố|thành phó|tp\.|tp|t\.p\.|quận|huyện|thị xã|phường|xã|thị trấn|q\.|h\.|p\.|x\.)\s*/i, '')
+    .trim()
+}
+
+const loadDistrictsForProvince = async (provinceName) => {
+  if (!provinceName) return
+  const normProvinceName = normalizeLocationName(provinceName)
+  const provObj = provinces.value.find(p => normalizeLocationName(p.name) === normProvinceName)
+  if (!provObj) return
+  
+  if (currentOrder.value && currentOrder.value.tinhThanhPho && normalizeLocationName(currentOrder.value.tinhThanhPho) === normProvinceName) {
+    currentOrder.value.tinhThanhPho = provObj.name
+  }
+  
+  try {
+    const res = await fetch('https://dev-online-gateway.ghn.vn/shiip/public-api/master-data/district', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Token': GHN_TOKEN
+      },
+      body: JSON.stringify({ province_id: Number(provObj.code) })
+    })
+    const json = await res.json()
+    if (json.code === 200 && json.data) {
+      districts.value = json.data.map(d => ({
+        name: d.DistrictName,
+        code: d.DistrictID
+      })).sort((a, b) => a.name.localeCompare(b.name))
+      return
+    } else {
+      throw new Error(json.message || 'GHN API returned error code ' + json.code)
+    }
+  } catch (err) {
+    console.warn('Failed to fetch GHN districts, falling back to open-api.vn:', err)
+  }
+
+  try {
+    const res = await fetch(`https://provinces.open-api.vn/api/p/${provObj.code}?depth=2`)
+    const data = await res.json()
+    districts.value = data.districts || []
+  } catch (err) {
+    console.error('Failed to fetch districts:', err)
+  }
+}
+
+const loadWardsForDistrict = async (districtName) => {
+  if (!districtName) return
+  const normDistrictName = normalizeLocationName(districtName)
+  const distObj = districts.value.find(d => normalizeLocationName(d.name) === normDistrictName)
+  if (!distObj) return
+  
+  if (currentOrder.value && currentOrder.value.quanHuyen && normalizeLocationName(currentOrder.value.quanHuyen) === normDistrictName) {
+    currentOrder.value.quanHuyen = distObj.name
+  }
+  
+  try {
+    const res = await fetch('https://dev-online-gateway.ghn.vn/shiip/public-api/master-data/ward', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Token': GHN_TOKEN
+      },
+      body: JSON.stringify({ district_id: Number(distObj.code) })
+    })
+    const json = await res.json()
+    if (json.code === 200 && json.data) {
+      wards.value = json.data.map(w => ({
+        name: w.WardName,
+        code: w.WardCode
+      })).sort((a, b) => a.name.localeCompare(b.name))
+      return
+    } else {
+      throw new Error(json.message || 'GHN API returned error code ' + json.code)
+    }
+  } catch (err) {
+    console.warn('Failed to fetch GHN wards, falling back to open-api.vn:', err)
+  }
+
+  try {
+    const res = await fetch(`https://provinces.open-api.vn/api/d/${distObj.code}?depth=2`)
+    const data = await res.json()
+    wards.value = data.wards || []
+  } catch (err) {
+    console.error('Failed to fetch wards:', err)
   }
 }
 
@@ -228,37 +348,7 @@ const onProvinceChange = async (event) => {
   const pName = event.target.value
   if (!pName) return
 
-  const provObj = provinces.value.find(p => p.name === pName)
-  if (provObj) {
-    try {
-      const res = await fetch('https://dev-online-gateway.ghn.vn/shiip/public-api/master-data/district', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Token': GHN_TOKEN
-        },
-        body: JSON.stringify({ province_id: Number(provObj.code) })
-      })
-      const json = await res.json()
-      if (json.code === 200 && json.data) {
-        districts.value = json.data.map(d => ({
-          name: d.DistrictName,
-          code: d.DistrictID
-        })).sort((a, b) => a.name.localeCompare(b.name))
-        return
-      }
-    } catch (err) {
-      console.warn('Failed to fetch GHN districts, falling back to open-api.vn:', err)
-    }
-
-    try {
-      const res = await fetch(`https://provinces.open-api.vn/api/p/${provObj.code}?depth=2`)
-      const data = await res.json()
-      districts.value = data.districts || []
-    } catch (err) {
-      console.error('Failed to fetch districts:', err)
-    }
-  }
+  await loadDistrictsForProvince(pName)
 }
 
 const onDistrictChange = async (event) => {
@@ -273,37 +363,7 @@ const onDistrictChange = async (event) => {
   const dName = event.target.value
   if (!dName) return
 
-  const distObj = districts.value.find(d => d.name === dName)
-  if (distObj) {
-    try {
-      const res = await fetch('https://dev-online-gateway.ghn.vn/shiip/public-api/master-data/ward', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Token': GHN_TOKEN
-        },
-        body: JSON.stringify({ district_id: Number(distObj.code) })
-      })
-      const json = await res.json()
-      if (json.code === 200 && json.data) {
-        wards.value = json.data.map(w => ({
-          name: w.WardName,
-          code: w.WardCode
-        })).sort((a, b) => a.name.localeCompare(b.name))
-        return
-      }
-    } catch (err) {
-      console.warn('Failed to fetch GHN wards, falling back to open-api.vn:', err)
-    }
-
-    try {
-      const res = await fetch(`https://provinces.open-api.vn/api/d/${distObj.code}?depth=2`)
-      const data = await res.json()
-      wards.value = data.wards || []
-    } catch (err) {
-      console.error('Failed to fetch wards:', err)
-    }
-  }
+  await loadWardsForDistrict(dName)
 }
 
 const onWardChange = async (event) => {
@@ -372,8 +432,10 @@ const calculateRealGHN = async () => {
   await onWardChange({ target: { value: currentOrder.value.phuongXa } })
 }
 
-// ---------------- ACTIVE VOUCHER AUTO-SELECTION ----------------
+// ---------------- ACTIVE VOUCHER AUTO-SELECTION & SELECTION MODAL ----------------
 const activeVouchers = ref([])
+const showVoucherSelectionModal = ref(false)
+const voucherSearchQuery = ref('')
 
 const fetchActiveVouchers = async () => {
   try {
@@ -387,6 +449,85 @@ const fetchActiveVouchers = async () => {
     console.error('Failed to load active vouchers:', err)
   }
 }
+
+const openVoucherSelectionModal = async () => {
+  if (!currentOrder.value) {
+    showToast('Vui lòng chọn hoặc tạo một đơn hàng trước!', 'warning')
+    return
+  }
+  await fetchActiveVouchers()
+  voucherSearchQuery.value = ''
+  showVoucherSelectionModal.value = true
+}
+
+const selectVoucherForOrder = async (v) => {
+  if (!currentOrder.value) return
+  const subtotal = currentOrder.value.chiTietList.reduce((sum, item) => sum + item.donGia * item.soLuong, 0)
+  if (subtotal < (v.dieuKienGiam || 0)) {
+    showToast(`Đơn hàng chưa đạt điều kiện tối thiểu ${formatCurrency(v.dieuKienGiam)}!`, 'error')
+    return
+  }
+  
+  try {
+    if (isUsingMock.value) {
+      currentOrder.value.voucher = v
+      calculatePrices(currentOrder.value)
+      saveOrdersState()
+      showToast(`Áp dụng phiếu giảm giá ${v.maPhieuGiamGia} thành công (Mock)!`, 'success')
+    } else {
+      await api.post(`/api/v1/ban-hang/don-hang/${currentOrder.value.id}/voucher`, {
+        maPhieuGiamGia: v.maPhieuGiamGia
+      })
+      showToast(`Áp dụng phiếu giảm giá ${v.maPhieuGiamGia} thành công!`, 'success')
+      await loadOrders()
+    }
+    showVoucherSelectionModal.value = false
+  } catch (err) {
+    showToast(err.response?.data?.message || 'Áp dụng mã giảm giá thất bại!', 'error')
+  }
+}
+
+const filteredVouchersForModal = computed(() => {
+  if (!currentOrder.value) return []
+  const subtotal = currentOrder.value.chiTietList.reduce((sum, item) => sum + item.donGia * item.soLuong, 0)
+  const list = getActiveVouchersList()
+  
+  return list.filter(v => {
+    const q = voucherSearchQuery.value.trim().toLowerCase()
+    if (q) {
+      const codeMatch = v.maPhieuGiamGia?.toLowerCase().includes(q)
+      const nameMatch = v.tenPhieuGiamGia?.toLowerCase().includes(q)
+      if (!codeMatch && !nameMatch) return false
+    }
+    
+    if (v.kieuApDung === 0) {
+      return true
+    } else if (v.kieuApDung === 1) {
+      if (!currentOrder.value.khachHang || !currentOrder.value.khachHang.id) return false
+      if (!v.danhSachKhachHangIds || !v.danhSachKhachHangIds.includes(currentOrder.value.khachHang.id)) return false
+      return true
+    }
+    return false
+  }).map(v => {
+    const isMinAmountMet = subtotal >= (v.dieuKienGiam || 0)
+    let discountVal = 0
+    if (v.loaiGiam === 0) {
+      discountVal = Math.round(subtotal * ((v.giaTri || 0) / 100))
+      if (v.giaGiamToiDa && discountVal > v.giaGiamToiDa) {
+        discountVal = v.giaGiamToiDa
+      }
+    } else {
+      discountVal = v.giaTri || 0
+    }
+    if (discountVal > subtotal) discountVal = subtotal
+    
+    return {
+      ...v,
+      isMinAmountMet,
+      discountVal
+    }
+  })
+})
 
 const getActiveVouchersList = () => {
   if (isUsingMock.value || activeVouchers.value.length === 0) {
@@ -421,11 +562,8 @@ const autoApplyBestVoucher = async (order) => {
 
   const list = getActiveVouchersList()
   const eligibleVouchers = list.filter(v => {
+    if (v.kieuApDung !== 0) return false // Auto-apply only store-wide vouchers
     if (subtotal < (v.dieuKienGiam || 0)) return false
-    if (v.kieuApDung === 1) {
-      if (!order.khachHang || !order.khachHang.id) return false
-      if (!v.danhSachKhachHangIds || !v.danhSachKhachHangIds.includes(order.khachHang.id)) return false
-    }
     return true
   })
 
@@ -548,7 +686,10 @@ const loadOrders = async () => {
         soTienGoc: order.soTienGoc || 0,
         soTienGiam: order.soTienGiam || 0,
         tongTienThanhToan: order.tongTienThanhToan || 0,
-        khachThanhToan: order.khachThanhToan || 0
+        khachThanhToan: order.khachThanhToan || 0,
+        tienMat: order.tienMat || 0,
+        tienChuyenKhoan: order.tienChuyenKhoan || 0,
+        ghiChuThanhToan: order.ghiChu || ''
       }))
       isUsingMock.value = false
       const currentActiveId = activeOrderId.value
@@ -629,7 +770,10 @@ const fetchOrderDetail = async (orderId) => {
           soTienGoc: (order.chiTietDonHang || []).reduce((sum, item) => sum + (item.donGia * item.soLuong), 0),
           soTienGiam: order.soTienGiam || 0,
           tongTienThanhToan: order.tongTienThanhToan ?? order.tongTien ?? 0,
-          khachThanhToan: order.khachThanhToan || order.tongTienThanhToan || order.tongTien || 0
+          khachThanhToan: order.khachThanhToan || 0,
+          tienMat: order.tienMat || 0,
+          tienChuyenKhoan: order.tienChuyenKhoan || 0,
+          ghiChuThanhToan: order.ghiChu || ''
         }
       }
     }
@@ -669,7 +813,10 @@ const createNewOrder = async () => {
         soTienGoc: 0,
         soTienGiam: 0,
         tongTienThanhToan: 0,
-        khachThanhToan: 0
+        khachThanhToan: 0,
+        tienMat: 0,
+        tienChuyenKhoan: 0,
+        ghiChuThanhToan: ''
       }
       orders.value.push(newOrder)
       saveMockOrders(orders.value)
@@ -788,6 +935,7 @@ const changeQuantity = async (item, delta) => {
       item.soLuong = newQty
       item.thanhTien = item.donGia * newQty
       await fetchOrderDetail(activeOrderId.value)
+      await autoApplyBestVoucher(currentOrder.value)
       showToast('Cập nhật số lượng thành công!', 'success')
     } catch (err) {
       // Failure / Out of stock: show error message from BE and rollback
@@ -837,6 +985,7 @@ const updateQuantityInput = async (item, event) => {
       item.soLuong = inputVal
       item.thanhTien = item.donGia * inputVal
       await fetchOrderDetail(activeOrderId.value)
+      await autoApplyBestVoucher(currentOrder.value)
       showToast('Cập nhật số lượng thành công!', 'success')
     } catch (err) {
       // Failure: show error message from BE and rollback
@@ -874,6 +1023,7 @@ const removeCartItem = (item) => {
             currentOrder.value.chiTietList = currentOrder.value.chiTietList.filter(i => i.id !== item.id)
           }
           await fetchOrderDetail(activeOrderId.value)
+          await autoApplyBestVoucher(currentOrder.value)
           showToast('Đã xóa sản phẩm khỏi giỏ hàng!', 'success')
         } catch (err) {
           const errorMsg = err.response?.data?.message || 'Xóa sản phẩm thất bại!'
@@ -950,7 +1100,11 @@ const fetchProductModalVariants = async () => {
         stock: item.soLuongTon ?? 0,
         salePrice: item.giaBan ?? 0,
         tenSanPham: item.tenSanPham || 'Áo thun thời trang',
-        anh: item.anh || 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=150'
+        anh: item.anh || 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=150',
+        phanTramGiam: item.phanTramGiam,
+        ngayBatDau: item.ngayBatDau,
+        ngayKetThuc: item.ngayKetThuc,
+        trangThaiDotGiamGia: item.trangThaiDotGiamGia
       }))
     } else {
       productVariants.value = []
@@ -1023,6 +1177,10 @@ const addVariantToCart = async (variant) => {
     return
   }
 
+  const effectivePrice = isDiscountActive(variant)
+    ? Math.round(variant.salePrice * (100 - variant.phanTramGiam) / 100)
+    : variant.salePrice
+
   const newCartItem = {
     id: currentOrder.value.chiTietList.length ? Math.max(...currentOrder.value.chiTietList.map(i => i.id)) + 1 : 1001,
     variantId: variant.id,
@@ -1030,9 +1188,9 @@ const addVariantToCart = async (variant) => {
     tenSanPham: variant.tenSanPham,
     color: variant.color,
     size: variant.size,
-    donGia: variant.salePrice,
+    donGia: effectivePrice,
     soLuong: 1,
-    thanhTien: variant.salePrice,
+    thanhTien: effectivePrice,
     image: variant.anh,
     stock: variant.stock,
     isLoading: false
@@ -1051,6 +1209,7 @@ const addVariantToCart = async (variant) => {
         soLuong: 1
       })
       await fetchOrderDetail(currentOrder.value.id)
+      await autoApplyBestVoucher(currentOrder.value)
     } catch (err) {
       console.warn('Failed to sync added product to API server:', err.message)
       showToast('Không thể thêm sản phẩm lên máy chủ!', 'error')
@@ -1132,7 +1291,11 @@ const handleScanQrSuccess = async (scannedCode) => {
         stock: item.soLuongTon ?? 0,
         salePrice: item.giaBan ?? 0,
         tenSanPham: item.tenSanPham || 'Áo thun',
-        anh: item.anh || ''
+        anh: item.anh || '',
+        phanTramGiam: item.phanTramGiam,
+        ngayBatDau: item.ngayBatDau,
+        ngayKetThuc: item.ngayKetThuc,
+        trangThaiDotGiamGia: item.trangThaiDotGiamGia
       }
       await addVariantToCart(mapped)
       showToast('Đã nhận diện và thêm thành công từ QR Code!', 'success')
@@ -1209,38 +1372,74 @@ const fetchCustomerModalList = async () => {
 const selectCustomer = async (cust) => {
   if (!currentOrder.value) return
 
-  currentOrder.value.khachHang = cust
-  currentOrder.value.tenKhachHang = cust.hoTen
-  currentOrder.value.soDienThoai = cust.sdt
-
-  // Auto fill delivery info if delivery is enabled
-  if (cust.diaChiList && cust.diaChiList.length > 0) {
-    const defaultAddr = cust.diaChiList.find(a => a.kieuDiaChiLaMacDinh) || cust.diaChiList[0]
-    currentOrder.value.tenNguoiNhan = defaultAddr.tenNguoiNhan || cust.hoTen
-    currentOrder.value.sdtNguoiNhan = defaultAddr.sdtNguoiNhan || cust.sdt
-    currentOrder.value.diaChiGiao = defaultAddr.diaChiCuThe || ''
-    currentOrder.value.tinhThanhPho = defaultAddr.tinhThanhPho || ''
-    currentOrder.value.quanHuyen = defaultAddr.quanHuyen || ''
-    currentOrder.value.phuongXa = defaultAddr.phuongXa || ''
-  } else {
-    currentOrder.value.tenNguoiNhan = cust.hoTen
-    currentOrder.value.sdtNguoiNhan = cust.sdt
-  }
-
-  showCustomerModal.value = false
-  showToast(`Đã gắn khách hàng "${cust.hoTen}" vào đơn hàng!`, 'success')
-  saveOrdersState()
-
-  if (!isUsingMock.value) {
-    try {
-      await api.put(`/api/v1/ban-hang/don-hang/${currentOrder.value.id}/khach-hang`, {}, {
-        params: { idKhachHang: cust.id }
-      })
-    } catch (err) {
-      console.warn('API customer binding failed:', err.message)
+  try {
+    let fullCust = cust
+    if (!isUsingMock.value) {
+      const res = await api.get(`/api/v1/khach-hang/${cust.id}`)
+      if (res.data) {
+        fullCust = res.data
+      }
     }
+
+    currentOrder.value.khachHang = fullCust
+    currentOrder.value.tenKhachHang = fullCust.hoTen
+    currentOrder.value.soDienThoai = fullCust.sdt
+
+    if (!isUsingMock.value) {
+      try {
+        await api.put(`/api/v1/ban-hang/don-hang/${currentOrder.value.id}/khach-hang`, {}, {
+          params: { idKhachHang: fullCust.id }
+        })
+      } catch (err) {
+        console.warn('API customer binding failed:', err.message)
+      }
+    }
+
+    // Auto fill delivery info if delivery is enabled
+    const addrList = fullCust.danhSachDiaChi || fullCust.diaChiList || []
+    if (addrList.length > 0) {
+      const defaultAddr = addrList.find(a => a.kieuDiaChiLaMacDinh) || addrList[0]
+      currentOrder.value.tenNguoiNhan = defaultAddr.tenNguoiNhan || fullCust.hoTen
+      currentOrder.value.sdtNguoiNhan = defaultAddr.sdtNguoiNhan || fullCust.sdt
+      currentOrder.value.diaChiGiao = defaultAddr.diaChiCuThe || ''
+      currentOrder.value.tinhThanhPho = defaultAddr.tinhThanhPho || ''
+      currentOrder.value.quanHuyen = defaultAddr.quanHuyen || ''
+      currentOrder.value.phuongXa = defaultAddr.phuongXa || ''
+
+      if (defaultAddr.tinhThanhPho) {
+        await loadDistrictsForProvince(defaultAddr.tinhThanhPho)
+        if (defaultAddr.quanHuyen) {
+          await loadWardsForDistrict(defaultAddr.quanHuyen)
+          
+          if (defaultAddr.phuongXa) {
+            const normWardName = normalizeLocationName(defaultAddr.phuongXa)
+            const wardObj = wards.value.find(w => normalizeLocationName(w.name) === normWardName)
+            if (wardObj) {
+              currentOrder.value.phuongXa = wardObj.name
+            }
+          }
+        }
+      }
+
+      if (currentOrder.value.loaiHoaDon === 1) {
+        await calculateRealGHN()
+      }
+    } else {
+      currentOrder.value.tenNguoiNhan = fullCust.hoTen
+      currentOrder.value.sdtNguoiNhan = fullCust.sdt
+      currentOrder.value.diaChiGiao = ''
+      currentOrder.value.tinhThanhPho = ''
+      currentOrder.value.quanHuyen = ''
+      currentOrder.value.phuongXa = ''
+    }
+
+    showCustomerModal.value = false
+    showToast(`Đã gắn khách hàng "${fullCust.hoTen}" vào đơn hàng!`, 'success')
+    saveOrdersState()
+    await autoApplyBestVoucher(currentOrder.value)
+  } catch (err) {
+    showToast('Gắn thông tin khách hàng thất bại: ' + (err.response?.data?.message || err.message), 'error')
   }
-  await autoApplyBestVoucher(currentOrder.value)
 }
 
 const clearBoundCustomer = async () => {
@@ -1265,6 +1464,293 @@ const clearBoundCustomer = async () => {
 watch(customerSearchQuery, () => {
   fetchCustomerModalList()
 })
+
+// Watch activeOrderId to load districts/wards when switching tabs
+watch(activeOrderId, async (newVal) => {
+  if (!newVal) {
+    districts.value = []
+    wards.value = []
+    return
+  }
+  const order = orders.value.find(o => o.id === newVal)
+  if (order && order.loaiHoaDon === 1) {
+    if (order.tinhThanhPho) {
+      await loadDistrictsForProvince(order.tinhThanhPho)
+      if (order.quanHuyen) {
+        await loadWardsForDistrict(order.quanHuyen)
+        
+        if (order.phuongXa) {
+          const normWardName = normalizeLocationName(order.phuongXa)
+          const wardObj = wards.value.find(w => normalizeLocationName(w.name) === normWardName)
+          if (wardObj) {
+            order.phuongXa = wardObj.name
+          }
+        }
+      }
+    } else {
+      districts.value = []
+      wards.value = []
+    }
+  } else {
+    districts.value = []
+    wards.value = []
+  }
+})
+
+// ---------------- CUSTOMER ADDRESS BOOK MODAL LOGIC ----------------
+const openAddressBookModal = async () => {
+  if (!currentOrder.value || !currentOrder.value.khachHang) {
+    showToast('Vui lòng chọn khách hàng trước!', 'warning')
+    return
+  }
+  addressBookCustomer.value = currentOrder.value.khachHang
+  await fetchAddressBookList()
+  
+  newAddressForm.value = {
+    tenNguoiNhan: addressBookCustomer.value.hoTen || '',
+    sdtNguoiNhan: addressBookCustomer.value.sdt || '',
+    diaChiCuThe: '',
+    tinhThanhPho: '',
+    quanHuyen: '',
+    phuongXa: '',
+    kieuDiaChiLaMacDinh: false
+  }
+  addressBookDistricts.value = []
+  addressBookWards.value = []
+  
+  showAddressBookModal.value = true
+}
+
+const fetchAddressBookList = async () => {
+  if (!addressBookCustomer.value) return
+  if (isUsingMock.value) {
+    addressBookList.value = addressBookCustomer.value.danhSachDiaChi || addressBookCustomer.value.diaChiList || []
+    return
+  }
+  try {
+    const res = await api.get(`/api/v1/khach-hang/${addressBookCustomer.value.id}`)
+    if (res.data) {
+      addressBookList.value = res.data.danhSachDiaChi || []
+      currentOrder.value.khachHang = res.data
+    }
+  } catch (err) {
+    showToast('Không thể tải danh sách địa chỉ khách hàng!', 'error')
+  }
+}
+
+const onAddressBookProvinceChange = async (event) => {
+  addressBookDistricts.value = []
+  addressBookWards.value = []
+  newAddressForm.value.quanHuyen = ''
+  newAddressForm.value.phuongXa = ''
+  
+  const pName = event.target.value
+  if (!pName) return
+  
+  const provObj = provinces.value.find(p => p.name === pName)
+  if (provObj) {
+    try {
+      const res = await fetch('https://dev-online-gateway.ghn.vn/shiip/public-api/master-data/district', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Token': GHN_TOKEN
+        },
+        body: JSON.stringify({ province_id: Number(provObj.code) })
+      })
+      const json = await res.json()
+      if (json.code === 200 && json.data) {
+        addressBookDistricts.value = json.data.map(d => ({
+          name: d.DistrictName,
+          code: d.DistrictID
+        })).sort((a, b) => a.name.localeCompare(b.name))
+        return
+      } else {
+        throw new Error(json.message || 'GHN API error code ' + json.code)
+      }
+    } catch (err) {
+      console.warn(err)
+    }
+    
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/p/${provObj.code}?depth=2`)
+      const data = await res.json()
+      addressBookDistricts.value = data.districts || []
+    } catch (err) {
+      console.error(err)
+    }
+  }
+}
+
+const onAddressBookDistrictChange = async (event) => {
+  addressBookWards.value = []
+  newAddressForm.value.phuongXa = ''
+  
+  const dName = event.target.value
+  if (!dName) return
+  
+  const distObj = addressBookDistricts.value.find(d => d.name === dName)
+  if (distObj) {
+    try {
+      const res = await fetch('https://dev-online-gateway.ghn.vn/shiip/public-api/master-data/ward', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Token': GHN_TOKEN
+        },
+        body: JSON.stringify({ district_id: Number(distObj.code) })
+      })
+      const json = await res.json()
+      if (json.code === 200 && json.data) {
+        addressBookWards.value = json.data.map(w => ({
+          name: w.WardName,
+          code: w.WardCode
+        })).sort((a, b) => a.name.localeCompare(b.name))
+        return
+      } else {
+        throw new Error(json.message || 'GHN API error code ' + json.code)
+      }
+    } catch (err) {
+      console.warn(err)
+    }
+    
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/d/${distObj.code}?depth=2`)
+      const data = await res.json()
+      addressBookWards.value = data.wards || []
+    } catch (err) {
+      console.error(err)
+    }
+  }
+}
+
+const addNewAddress = async () => {
+  if (!addressBookCustomer.value) return
+  const form = newAddressForm.value
+  if (!form.tenNguoiNhan || !form.sdtNguoiNhan || !form.tinhThanhPho || !form.quanHuyen || !form.phuongXa || !form.diaChiCuThe) {
+    showToast('Vui lòng nhập đầy đủ các trường thông tin bắt buộc (*)!', 'error')
+    return
+  }
+  
+  const phoneRegex = /^(0[3|5|7|8|9])([0-9]{8})$/
+  if (!phoneRegex.test(form.sdtNguoiNhan)) {
+    showToast('Số điện thoại người nhận không hợp lệ!', 'error')
+    return
+  }
+  
+  try {
+    if (isUsingMock.value) {
+      const newAddr = {
+        id: Math.floor(Math.random() * 1000) + 2000,
+        tenNguoiNhan: form.tenNguoiNhan,
+        sdtNguoiNhan: form.sdtNguoiNhan,
+        diaChiCuThe: form.diaChiCuThe,
+        tinhThanhPho: form.tinhThanhPho,
+        quanHuyen: form.quanHuyen,
+        phuongXa: form.phuongXa,
+        kieuDiaChiLaMacDinh: form.kieuDiaChiLaMacDinh
+      }
+      
+      const list = addressBookCustomer.value.danhSachDiaChi || addressBookCustomer.value.diaChiList || []
+      if (form.kieuDiaChiLaMacDinh) {
+        list.forEach(a => a.kieuDiaChiLaMacDinh = false)
+      }
+      if (list.length === 0) {
+        newAddr.kieuDiaChiLaMacDinh = true
+      }
+      list.push(newAddr)
+      addressBookCustomer.value.danhSachDiaChi = list
+      addressBookCustomer.value.diaChiList = list
+      
+      showToast('Thêm mới địa chỉ thành công (Mock)!', 'success')
+      await fetchAddressBookList()
+      
+      newAddressForm.value = {
+        tenNguoiNhan: addressBookCustomer.value.hoTen || '',
+        sdtNguoiNhan: addressBookCustomer.value.sdt || '',
+        diaChiCuThe: '',
+        tinhThanhPho: '',
+        quanHuyen: '',
+        phuongXa: '',
+        kieuDiaChiLaMacDinh: false
+      }
+      addressBookDistricts.value = []
+      addressBookWards.value = []
+    } else {
+      await api.post(`/api/v1/khach-hang/${addressBookCustomer.value.id}/dia-chi`, {
+        tenNguoiNhan: form.tenNguoiNhan,
+        sdtNguoiNhan: form.sdtNguoiNhan,
+        diaChiCuThe: form.diaChiCuThe,
+        tinhThanhPho: form.tinhThanhPho,
+        quanHuyen: form.quanHuyen,
+        phuongXa: form.phuongXa,
+        kieuDiaChiLaMacDinh: form.kieuDiaChiLaMacDinh
+      })
+      
+      showToast('Thêm mới địa chỉ thành công!', 'success')
+      await fetchAddressBookList()
+      
+      newAddressForm.value = {
+        tenNguoiNhan: addressBookCustomer.value.hoTen || '',
+        sdtNguoiNhan: addressBookCustomer.value.sdt || '',
+        diaChiCuThe: '',
+        tinhThanhPho: '',
+        quanHuyen: '',
+        phuongXa: '',
+        kieuDiaChiLaMacDinh: false
+      }
+      addressBookDistricts.value = []
+      addressBookWards.value = []
+    }
+  } catch (err) {
+    const errorMsg = err.response?.data?.message || 'Không thể thêm địa chỉ mới!'
+    showToast(errorMsg, 'error')
+  }
+}
+
+const setAddressDefault = async (addrId) => {
+  if (!addressBookCustomer.value) return
+  try {
+    await api.patch(`/api/v1/khach-hang/${addressBookCustomer.value.id}/dia-chi/${addrId}/mac-dinh`)
+    showToast('Đặt địa chỉ mặc định thành công!', 'success')
+    await fetchAddressBookList()
+  } catch (err) {
+    showToast('Không thể đặt địa chỉ mặc định!', 'error')
+  }
+}
+
+const selectAddressForDelivery = async (addr) => {
+  if (!currentOrder.value) return
+  
+  currentOrder.value.tenNguoiNhan = addr.tenNguoiNhan || currentOrder.value.khachHang.hoTen
+  currentOrder.value.sdtNguoiNhan = addr.sdtNguoiNhan || currentOrder.value.khachHang.sdt
+  currentOrder.value.diaChiGiao = addr.diaChiCuThe || ''
+  currentOrder.value.tinhThanhPho = addr.tinhThanhPho || ''
+  currentOrder.value.quanHuyen = addr.quanHuyen || ''
+  currentOrder.value.phuongXa = addr.phuongXa || ''
+  
+  if (addr.tinhThanhPho) {
+    await loadDistrictsForProvince(addr.tinhThanhPho)
+    if (addr.quanHuyen) {
+      await loadWardsForDistrict(addr.quanHuyen)
+      
+      if (addr.phuongXa) {
+        const normWardName = normalizeLocationName(addr.phuongXa)
+        const wardObj = wards.value.find(w => normalizeLocationName(w.name) === normWardName)
+        if (wardObj) {
+          currentOrder.value.phuongXa = wardObj.name
+        }
+      }
+    }
+  }
+  
+  if (currentOrder.value.loaiHoaDon === 1) {
+    await calculateRealGHN()
+  }
+  
+  showAddressBookModal.value = false
+  showToast('Đã chọn địa chỉ nhận hàng!', 'success')
+}
 
 // ---------------- VOUCHER HANDLING ----------------
 const voucherCodeInput = ref('')
@@ -1503,6 +1989,76 @@ const openPaymentModal = () => {
   showPaymentModal.value = true
 }
 
+const savePaymentDataAndCloseModal = (paymentData) => {
+  if (!currentOrder.value) return
+  currentOrder.value.tienMat = Number(paymentData.tienMat || 0)
+  currentOrder.value.tienChuyenKhoan = Number(paymentData.tienChuyenKhoan || 0)
+  currentOrder.value.khachThanhToan = currentOrder.value.tienMat + currentOrder.value.tienChuyenKhoan
+  currentOrder.value.ghiChuThanhToan = paymentData.ghiChu || ''
+  showPaymentModal.value = false
+  saveOrdersState()
+}
+
+const getCheckoutPaymentMethodLabel = (order) => {
+  if (!order) return ''
+  const tm = Number(order.tienMat || 0)
+  const ck = Number(order.tienChuyenKhoan || 0)
+  if (tm > 0 && ck > 0) return 'Tiền mặt & Chuyển khoản'
+  if (ck > 0) return 'Chuyển khoản'
+  if (tm > 0) return 'Tiền mặt'
+  if (order.loaiHoaDon === 1) return 'Chưa thanh toán (COD)'
+  return 'Tiền mặt'
+}
+
+const getFinalCheckoutPaymentData = (order) => {
+  if (!order) return { tienMat: 0, tienChuyenKhoan: 0, ghiChu: '' }
+  const tm = Number(order.tienMat || 0)
+  const ck = Number(order.tienChuyenKhoan || 0)
+  const total = Number(order.tongTienThanhToan || 0)
+  
+  if (tm === 0 && ck === 0) {
+    if (order.loaiHoaDon === 0) {
+      return {
+        tienMat: total,
+        tienChuyenKhoan: 0,
+        ghiChu: order.ghiChuThanhToan || ''
+      }
+    } else {
+      return {
+        tienMat: 0,
+        tienChuyenKhoan: 0,
+        ghiChu: order.ghiChuThanhToan || ''
+      }
+    }
+  }
+  
+  return {
+    tienMat: tm,
+    tienChuyenKhoan: ck,
+    ghiChu: order.ghiChuThanhToan || ''
+  }
+}
+
+const getKhachThanhToanDisplayVal = (order) => {
+  if (!order) return 0
+  const tm = Number(order.tienMat || 0)
+  const ck = Number(order.tienChuyenKhoan || 0)
+  if (tm === 0 && ck === 0) {
+    if (order.loaiHoaDon === 0) return order.tongTienThanhToan
+    return 0
+  }
+  return order.khachThanhToan || (tm + ck)
+}
+
+const submitFinalCheckout = async () => {
+  if (!currentOrder.value) return
+  const order = currentOrder.value
+  const paymentData = getFinalCheckoutPaymentData(order)
+  
+  showCheckoutConfirmModal.value = false
+  await executeCheckout(order, paymentData)
+}
+
 const executeCheckout = async (order, paymentData) => {
   isLoading.value = true
   try {
@@ -1588,7 +2144,15 @@ const confirmCheckoutOrder = () => {
     }
   }
 
-  openPaymentModal()
+  if (order.loaiHoaDon === 0) { // Tại quầy validation
+    const paid = Number(order.tienMat || 0) + Number(order.tienChuyenKhoan || 0)
+    if (paid < order.tongTienThanhToan) {
+      showToast(`Khách chưa thanh toán đủ tiền! Vui lòng thanh toán thêm ${formatCurrency(order.tongTienThanhToan - paid)}.`, 'warning')
+      return
+    }
+  }
+
+  showCheckoutConfirmModal.value = true
 }
 
 onMounted(async () => {
@@ -1609,7 +2173,7 @@ onUnmounted(async () => {
     <div class="flex items-center justify-between mb-6">
       <div class="flex flex-col">
         <h1 class="text-3xl font-bold text-[#0D2533] font-headline-md tracking-tight">Bán hàng</h1>
-        <p class="text-sm text-gray-500">Người bán: Nguyễn Hoàng Admin</p>
+        <p class="text-sm text-gray-500">Người bán: Trần Tuấn Linh</p>
       </div>
       <button 
         @click="createNewOrder"
@@ -1769,11 +2333,18 @@ onUnmounted(async () => {
               <div class="space-y-4">
                 <div class="flex items-center justify-between">
                   <h2 class="text-lg font-bold text-[#0D2533]">Thông tin khách hàng</h2>
-                  <div class="flex gap-2">
+                  <div class="flex gap-2 items-center">
                     <button 
                       @click="openCustomerModal"
                       class="text-xs font-semibold text-[#ef972d] hover:underline cursor-pointer bg-transparent border-none"
                     >Chọn khách hàng</button>
+                    <span class="text-gray-300 text-xs" v-if="currentOrder.khachHang">|</span>
+                    <button 
+                      v-if="currentOrder.khachHang"
+                      @click="openAddressBookModal"
+                      class="text-xs font-semibold text-[#ef972d] hover:underline cursor-pointer bg-transparent border-none"
+                    >Sổ địa chỉ</button>
+                    <span class="text-gray-300 text-xs" v-if="currentOrder.khachHang">|</span>
                     <button 
                       v-if="currentOrder.khachHang"
                       @click="clearBoundCustomer"
@@ -1923,14 +2494,21 @@ onUnmounted(async () => {
                 <div class="grid grid-cols-12 gap-3 items-end">
                   <div class="col-span-9">
                     <label class="block text-xs font-semibold text-gray-500 mb-1">Mã phiếu giảm giá</label>
-                    <div class="relative">
+                    <div class="relative flex items-center">
                       <input 
                         v-model="voucherCodeInput"
                         @keyup.enter="applyVoucherCode"
-                        class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none" 
+                        class="w-full pl-4 pr-20 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none" 
                         placeholder="Nhập mã (Enter để áp dụng)" 
                         type="text"
                       />
+                      <button 
+                        type="button"
+                        @click="openVoucherSelectionModal"
+                        class="absolute right-1.5 px-3 py-1 bg-gradient-to-r from-orange-500 to-[#ef972d] hover:from-orange-600 hover:to-[#ef972d]/90 text-white rounded-md text-[11px] font-bold transition-all shadow-sm cursor-pointer"
+                      >
+                        Chọn mã
+                      </button>
                     </div>
                   </div>
                   <div class="col-span-3">
@@ -2092,8 +2670,14 @@ onUnmounted(async () => {
             class="border border-gray-100 hover:border-gray-200 p-4 rounded-xl flex items-center justify-between gap-4 transition-all hover:shadow-sm bg-gray-50/20"
           >
             <div class="flex items-center gap-3">
-              <div class="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden border border-gray-100 flex-shrink-0">
+              <div class="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden border border-gray-100 flex-shrink-0 relative">
                 <img :src="formatImage(variant.anh)" class="w-full h-full object-cover" alt="Variant Image"/>
+                <span
+                  v-if="isDiscountActive(variant)"
+                  class="absolute top-0 left-0 bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-br-lg shadow-sm"
+                >
+                  -{{ variant.phanTramGiam }}%
+                </span>
               </div>
               <div class="space-y-0.5">
                 <h4 class="font-bold text-sm text-[#0D2533] line-clamp-1">{{ variant.tenSanPham }}</h4>
@@ -2101,7 +2685,17 @@ onUnmounted(async () => {
                 <p class="text-xs font-mono text-gray-400">Mã: {{ variant.variantCode }}</p>
                 <div class="flex items-center gap-2 mt-1">
                   <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600">Kho: {{ getAvailableStockForModal(variant) }}</span>
-                  <span class="text-sm font-bold text-[#ef972d]">{{ formatCurrency(variant.salePrice) }}</span>
+                  <div v-if="isDiscountActive(variant)" class="flex items-center gap-1.5">
+                    <span class="text-xs text-gray-400 line-through">
+                      {{ formatCurrency(variant.salePrice) }}
+                    </span>
+                    <span class="text-sm font-bold text-red-500">
+                      {{ formatCurrency(Math.round(variant.salePrice * (100 - variant.phanTramGiam) / 100)) }}
+                    </span>
+                  </div>
+                  <span v-else class="text-sm font-bold text-[#ef972d]">
+                    {{ formatCurrency(variant.salePrice) }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -2221,6 +2815,417 @@ onUnmounted(async () => {
     @submit="executeCheckout(currentOrder, $event)"
   />
 
+  <!-- ==================== CUSTOMER ADDRESS BOOK MODAL ==================== -->
+  <div v-if="showAddressBookModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden border border-gray-100 shadow-2xl flex flex-col">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[#ef972d] text-2xl">location_on</span>
+          <div>
+            <h3 class="text-lg font-bold text-gray-800">Sổ địa chỉ khách hàng</h3>
+            <p class="text-xs text-gray-500 font-medium" v-if="addressBookCustomer">
+              {{ addressBookCustomer.hoTen }} • {{ addressBookCustomer.maKhachHang || 'N/A' }}
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button 
+            @click="fetchAddressBookList" 
+            class="text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 cursor-pointer"
+            title="Làm mới"
+          >
+            <span class="material-symbols-outlined">refresh</span>
+          </button>
+          <button 
+            @click="showAddressBookModal = false" 
+            class="text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 cursor-pointer"
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-y-auto p-6 grid grid-cols-12 gap-6 bg-white">
+        <!-- Left Side: Address list -->
+        <div class="col-span-12 lg:col-span-7 space-y-4">
+          <div class="flex items-center gap-2 border-b border-gray-100 pb-2">
+            <span class="material-symbols-outlined text-gray-600">list_alt</span>
+            <h4 class="font-bold text-[#0D2533]">Danh sách địa chỉ</h4>
+          </div>
+          
+          <div v-if="addressBookList.length === 0" class="p-8 text-center text-gray-400 border border-dashed border-gray-200 rounded-xl">
+            <span class="material-symbols-outlined text-4xl mb-1">location_off</span>
+            <p class="text-sm font-medium">Khách hàng chưa có địa chỉ lưu trữ nào.</p>
+          </div>
+          
+          <div v-else class="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+            <div 
+              v-for="(addr, idx) in addressBookList" 
+              :key="addr.id || idx"
+              class="border border-gray-100 rounded-xl p-4 hover:border-[#ef972d]/40 transition-all flex items-start justify-between gap-4 bg-gray-50/20 group relative cursor-pointer"
+              @click="selectAddressForDelivery(addr)"
+            >
+              <div class="flex gap-3">
+                <span class="text-sm font-bold text-gray-400 mt-0.5 w-5 text-center">{{ idx + 1 }}</span>
+                <div class="space-y-1">
+                  <p class="text-sm text-gray-800 font-semibold leading-normal">
+                    {{ addr.diaChiCuThe }}, {{ addr.phuongXa }}, {{ addr.quanHuyen }}, {{ addr.tinhThanhPho }}
+                  </p>
+                  <p class="text-xs text-gray-500 font-medium">
+                    Người nhận: <span class="text-gray-700 font-semibold">{{ addr.tenNguoiNhan }}</span> - SĐT: <span class="text-gray-700 font-semibold font-mono">{{ addr.sdtNguoiNhan }}</span>
+                  </p>
+                </div>
+              </div>
+              
+              <div class="flex flex-col items-end gap-2 flex-shrink-0" @click.stop>
+                <!-- Default address badge -->
+                <span 
+                  v-if="addr.kieuDiaChiLaMacDinh" 
+                  class="bg-orange-50 border border-orange-200 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                >
+                  Mặc định
+                </span>
+                <!-- Set default button -->
+                <button 
+                  v-else 
+                  @click="setAddressDefault(addr.id)"
+                  class="text-[11px] font-bold text-[#ef972d] hover:underline cursor-pointer bg-transparent border-none outline-none"
+                >
+                  Đặt mặc định
+                </button>
+                
+                <!-- Choose address button -->
+                <button
+                  @click="selectAddressForDelivery(addr)"
+                  class="mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-[#ef972d] text-white text-xs font-semibold px-3 py-1 rounded-lg shadow-sm hover:bg-[#ef972d]/90 cursor-pointer"
+                >
+                  Chọn
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Add address form -->
+        <div class="col-span-12 lg:col-span-5 border-t lg:border-t-0 lg:border-l border-gray-100 pt-6 lg:pt-0 lg:pl-6 space-y-4">
+          <div class="flex items-center gap-2 border-b border-gray-100 pb-2">
+            <span class="material-symbols-outlined text-gray-600">add_location</span>
+            <h4 class="font-bold text-[#0D2533]">Thêm nhanh địa chỉ</h4>
+          </div>
+          
+          <div class="space-y-3.5">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-bold text-gray-600">Họ tên người nhận *</label>
+              <input 
+                v-model="newAddressForm.tenNguoiNhan"
+                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none" 
+                placeholder="Tên người nhận" 
+                type="text"
+              />
+            </div>
+            
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-bold text-gray-600">Số điện thoại *</label>
+              <input 
+                v-model="newAddressForm.sdtNguoiNhan"
+                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none" 
+                placeholder="Số điện thoại nhận hàng" 
+                type="text"
+              />
+            </div>
+            
+            <div class="grid grid-cols-1 gap-2.5">
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-bold text-gray-600">Thành phố/Tỉnh *</label>
+                <select 
+                  v-model="newAddressForm.tinhThanhPho"
+                  @change="onAddressBookProvinceChange"
+                  class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none cursor-pointer"
+                >
+                  <option value="">Chọn hoặc nhập tỉnh/thành</option>
+                  <option v-for="p in provinces" :key="p.code" :value="p.name">{{ p.name }}</option>
+                </select>
+              </div>
+              
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-bold text-gray-600">Quận/Huyện *</label>
+                <select 
+                  v-model="newAddressForm.quanHuyen"
+                  @change="onAddressBookDistrictChange"
+                  class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none cursor-pointer"
+                  :disabled="addressBookDistricts.length === 0"
+                >
+                  <option value="">Chọn hoặc nhập quận/huyện</option>
+                  <option v-for="d in addressBookDistricts" :key="d.code" :value="d.name">{{ d.name }}</option>
+                </select>
+              </div>
+              
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-bold text-gray-600">Phường/Xã *</label>
+                <select 
+                  v-model="newAddressForm.phuongXa"
+                  class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none cursor-pointer"
+                  :disabled="addressBookWards.length === 0"
+                >
+                  <option value="">Chọn hoặc nhập phường/xã</option>
+                  <option v-for="w in addressBookWards" :key="w.code" :value="w.name">{{ w.name }}</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-bold text-gray-600">Địa chỉ cụ thể *</label>
+              <input 
+                v-model="newAddressForm.diaChiCuThe"
+                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none" 
+                placeholder="Số nhà, tên đường..." 
+                type="text"
+              />
+            </div>
+            
+            <div class="flex items-center gap-2 pt-1">
+              <input 
+                id="addressBookDefaultChk"
+                v-model="newAddressForm.kieuDiaChiLaMacDinh" 
+                type="checkbox"
+                class="rounded border-outline-variant text-[#ef972d] focus:ring-[#ef972d] cursor-pointer accent-[#ef972d] h-4 w-4"
+              />
+              <label for="addressBookDefaultChk" class="text-xs font-semibold text-gray-600 cursor-pointer select-none">
+                Đặt làm địa chỉ mặc định
+              </label>
+            </div>
+            
+            <button 
+              @click="addNewAddress"
+              class="w-full py-2.5 bg-[#ef972d] text-white hover:bg-[#ef972d]/90 rounded-lg font-bold text-sm shadow-sm transition-colors cursor-pointer text-center mt-3 uppercase"
+            >
+              Thêm nhanh
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VOUCHER SELECTION MODAL ==================== -->
+  <div v-if="showVoucherSelectionModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white text-[#0D2533] rounded-2xl max-w-lg w-full overflow-hidden border border-gray-100 shadow-2xl flex flex-col max-h-[85vh]">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[#ef972d] text-2xl font-bold">local_activity</span>
+          <h3 class="font-headline-sm text-lg font-bold text-gray-800">Chọn phiếu giảm giá</h3>
+        </div>
+        <button 
+          @click="showVoucherSelectionModal = false" 
+          class="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
+        >
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <!-- Search and Customer filter info -->
+      <div class="p-6 pb-4 border-b border-gray-100 space-y-3">
+        <div class="relative">
+          <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-400 text-lg">search</span>
+          <input 
+            v-model="voucherSearchQuery"
+            type="text" 
+            placeholder="Tìm kiếm phiếu giảm giá (mã hoặc tên)..." 
+            class="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-[#ef972d] focus:border-[#ef972d] outline-none"
+          />
+        </div>
+        <div v-if="currentOrder?.khachHang" class="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm font-bold">account_circle</span>
+          <span>Đang hiển thị ưu đãi cho khách hàng: <strong>{{ currentOrder.khachHang.hoTen }}</strong> (Hiển thị cả mã cá nhân).</span>
+        </div>
+        <div v-else class="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm font-bold">info</span>
+          <span>Đơn đang đặt dưới dạng <strong>Khách lẻ</strong> (Chỉ hiển thị mã toàn cửa hàng).</span>
+        </div>
+      </div>
+
+      <!-- Vouchers List -->
+      <div class="p-6 overflow-y-auto flex-1 space-y-3 bg-gray-50/50">
+        <div v-if="filteredVouchersForModal.length === 0" class="text-center py-10 text-gray-400">
+          <span class="material-symbols-outlined text-4xl block mb-2">local_activity</span>
+          <span class="text-sm font-medium">Không tìm thấy phiếu giảm giá nào phù hợp.</span>
+        </div>
+
+        <div 
+          v-for="v in filteredVouchersForModal" 
+          :key="v.id" 
+          class="bg-white rounded-xl border p-4 transition-all flex items-start gap-4 shadow-sm"
+          :class="v.isMinAmountMet ? 'border-gray-200 hover:border-[#ef972d]/50' : 'border-gray-200 opacity-75'"
+        >
+          <!-- Left side ticket icon -->
+          <div 
+            class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+            :class="v.kieuApDung === 0 ? 'bg-orange-50 text-orange-600' : 'bg-purple-50 text-purple-600'"
+          >
+            <span class="material-symbols-outlined text-2xl">confirmation_number</span>
+          </div>
+
+          <!-- Middle details -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-sm text-[#0D2533] uppercase tracking-wide font-mono">{{ v.maPhieuGiamGia }}</span>
+              <span 
+                class="px-2 py-0.5 text-[9px] font-bold rounded-full"
+                :class="v.kieuApDung === 0 ? 'bg-orange-50 border border-orange-200 text-orange-600' : 'bg-purple-50 border border-purple-200 text-purple-600'"
+              >
+                {{ v.kieuApDung === 0 ? 'Toàn cửa hàng' : 'Cá nhân' }}
+              </span>
+            </div>
+            <p class="text-xs font-semibold text-gray-700 mt-1">{{ v.tenPhieuGiamGia }}</p>
+            
+            <!-- Discount value and conditions -->
+            <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+              Chi tiết: 
+              <span class="font-bold text-[#ef972d]">
+                Giảm {{ v.loaiGiam === 0 ? v.giaTri + '%' : formatCurrency(v.giaTri) }}
+              </span>
+              <span v-if="v.loaiGiam === 0 && v.giaGiamToiDa"> (Tối đa {{ formatCurrency(v.giaGiamToiDa) }})</span>
+            </p>
+            
+            <!-- Min amount condition status -->
+            <p class="text-[11px] mt-1.5 flex items-center gap-1">
+              <span class="font-semibold text-gray-500">Đơn tối thiểu:</span>
+              <span class="font-bold text-gray-700">{{ formatCurrency(v.dieuKienGiam) }}</span>
+            </p>
+
+            <div class="mt-2.5 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between flex-wrap gap-2 text-[10px]">
+              <span class="text-gray-400">
+                Hạn dùng: {{ new Date(v.ngayKetThuc).toLocaleDateString('vi-VN') }}
+              </span>
+              
+              <!-- Indicator status -->
+              <span v-if="v.isMinAmountMet" class="text-emerald-600 font-bold flex items-center gap-0.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                <span class="material-symbols-outlined text-[10px] font-bold">check</span> Đủ điều kiện
+              </span>
+              <span v-else class="text-red-500 font-semibold flex items-center gap-0.5 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+                <span class="material-symbols-outlined text-[10px] font-bold">close</span> Mua thêm {{ formatCurrency(v.dieuKienGiam - (currentOrder?.chiTietList.reduce((sum, item) => sum + item.donGia * item.soLuong, 0) || 0)) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Right side action button -->
+          <div class="flex-shrink-0 self-center">
+            <button 
+              type="button"
+              @click="selectVoucherForOrder(v)"
+              :disabled="!v.isMinAmountMet"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+              :class="v.isMinAmountMet 
+                ? 'bg-gradient-to-r from-orange-500 to-[#ef972d] hover:from-orange-600 hover:to-[#ef972d]/90 text-white' 
+                : 'bg-gray-50 text-gray-400 border border-gray-200'"
+            >
+              Áp dụng
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PAYMENT MODAL ==================== -->
+  <PaymentModal
+    :show="showPaymentModal"
+    :totalAmount="currentOrder ? currentOrder.tongTienThanhToan : 0"
+    :invoiceCode="currentOrder ? currentOrder.maHoaDon : ''"
+    :loading="isLoading"
+    @close="showPaymentModal = false"
+    @submit="savePaymentDataAndCloseModal"
+  />
+
+  <!-- ==================== CHECKOUT CONFIRMATION MODAL ==================== -->
+  <div v-if="showCheckoutConfirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white text-[#0D2533] rounded-2xl max-w-md w-full overflow-hidden border border-gray-100 shadow-2xl flex flex-col">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <h3 class="font-bold text-gray-800 text-base">Xác nhận đặt hàng</h3>
+        <button 
+          @click="showCheckoutConfirmModal = false" 
+          :disabled="isLoading"
+          class="p-1.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer disabled:opacity-50"
+        >
+          <span class="material-symbols-outlined text-gray-500 block">close</span>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-4">
+        <!-- Details Card -->
+        <div class="border border-gray-100 rounded-2xl bg-gray-50/50 p-4 space-y-3">
+          <div class="flex justify-between items-center text-sm">
+            <span class="text-gray-500 font-medium">Loại đơn</span>
+            <span class="font-bold text-gray-800">{{ currentOrder?.loaiHoaDon === 1 ? 'Giao hàng' : 'Tại quầy' }}</span>
+          </div>
+          
+          <div class="flex justify-between items-center text-sm pt-2 border-t border-dashed border-gray-200">
+            <span class="text-gray-500 font-medium">Tiền hàng</span>
+            <span class="font-bold text-gray-800">{{ formatCurrency(currentOrder?.soTienGoc) }}</span>
+          </div>
+
+          <div class="flex justify-between items-center text-sm pt-2 border-t border-dashed border-gray-200">
+            <span class="text-gray-500 font-medium">Giảm giá</span>
+            <span class="font-bold text-red-600">- {{ formatCurrency(currentOrder?.soTienGiam) }}</span>
+          </div>
+
+          <div v-if="currentOrder?.loaiHoaDon === 1" class="flex justify-between items-center text-sm pt-2 border-t border-dashed border-gray-200">
+            <span class="text-gray-500 font-medium">Phí vận chuyển</span>
+            <span class="font-bold text-gray-800">+ {{ formatCurrency(currentOrder?.phiVanChuyen) }}</span>
+          </div>
+
+          <div class="flex justify-between items-center text-sm pt-2 border-t border-dashed border-gray-200">
+            <span class="text-gray-500 font-bold">Tổng phải trả</span>
+            <span class="font-black text-red-700 text-base">{{ formatCurrency(currentOrder?.tongTienThanhToan) }}</span>
+          </div>
+
+          <div class="flex justify-between items-center text-sm pt-2 border-t border-dashed border-gray-200">
+            <span class="text-gray-500 font-medium">Hình thức thanh toán</span>
+            <span class="font-bold text-gray-800">{{ getCheckoutPaymentMethodLabel(currentOrder) }}</span>
+          </div>
+
+          <div class="flex justify-between items-center text-sm pt-2 border-t border-dashed border-gray-200">
+            <span class="text-gray-500 font-medium">Khách thanh toán</span>
+            <span class="font-bold text-gray-800">{{ formatCurrency(getKhachThanhToanDisplayVal(currentOrder)) }}</span>
+          </div>
+        </div>
+
+        <!-- Warning block -->
+        <div class="p-3.5 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700 flex items-start gap-2 leading-relaxed">
+          <span class="material-symbols-outlined text-sm font-bold mt-0.5">warning</span>
+          <span>Bạn có chắc muốn xác nhận? Sau khi xác nhận, hệ thống sẽ lưu/chốt đơn và cập nhật tồn kho.</span>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+        <button 
+          type="button"
+          @click="showCheckoutConfirmModal = false"
+          :disabled="isLoading"
+          class="px-5 py-2 hover:bg-gray-100 border border-gray-300 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
+        >
+          Hủy
+        </button>
+        
+        <button 
+          type="button"
+          @click="submitFinalCheckout"
+          :disabled="isLoading"
+          class="bg-gradient-to-r from-red-800 to-red-950 hover:opacity-95 text-white font-black shadow-md rounded-xl px-5 py-2 text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 min-w-[120px] cursor-pointer"
+        >
+          <span v-if="isLoading" class="w-4.5 h-4.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          <span>Xác nhận</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Custom Confirmation Modal -->
   <div v-if="confirmModal.show" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white text-[#0D2533] rounded-xl max-w-md w-full overflow-hidden border border-gray-100 shadow-2xl">
@@ -2253,11 +3258,12 @@ onUnmounted(async () => {
     :class="{
       'bg-emerald-50 border-emerald-200 text-emerald-800': toast.type === 'success',
       'bg-red-50 border-red-200 text-red-800': toast.type === 'error',
-      'bg-blue-50 border-blue-200 text-blue-800': toast.type === 'info'
+      'bg-blue-50 border-blue-200 text-blue-800': toast.type === 'info',
+      'bg-amber-50 border-amber-200 text-amber-800': toast.type === 'warning'
     }"
   >
     <span class="material-symbols-outlined text-lg">
-      {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : 'info' }}
+      {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : toast.type === 'warning' ? 'warning' : 'info' }}
     </span>
     <span class="text-sm font-semibold font-body-md">{{ toast.message }}</span>
     <button @click="toast.show = false" class="ml-4 text-gray-400 hover:text-gray-600 cursor-pointer">

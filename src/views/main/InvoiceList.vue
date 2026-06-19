@@ -309,7 +309,8 @@ onMounted(() => {
           >
             <option value="all">Tất cả</option>
             <option value="0">Tại quầy</option>
-            <option value="1">Online/Giao hàng</option>
+            <option value="1">Giao hàng</option>
+            <option value="2">Online</option>
           </select>
         </div>
       </div>
@@ -468,10 +469,22 @@ onMounted(() => {
               </td>
               <td class="py-3.5 px-4">
                 <span
-                  :class="item.loaiDon === 0 ? 'bg-surface-container-high text-on-surface border border-outline-variant' : 'bg-secondary-container text-on-secondary-container'"
-                  class="inline-flex items-center px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide"
+                  v-if="item.loaiDon === 0"
+                  class="inline-flex items-center px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide bg-gray-100 text-gray-800 border border-gray-200"
                 >
-                  {{ item.loaiDon === 0 ? 'Tại quầy' : 'Online' }}
+                  Tại quầy
+                </span>
+                <span
+                  v-else-if="item.loaiDon === 1"
+                  class="inline-flex items-center px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide bg-blue-100 text-blue-800 border border-blue-200"
+                >
+                  Giao hàng
+                </span>
+                <span
+                  v-else
+                  class="inline-flex items-center px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide bg-green-100 text-green-800 border border-green-200"
+                >
+                  Online
                 </span>
               </td>
               <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface">

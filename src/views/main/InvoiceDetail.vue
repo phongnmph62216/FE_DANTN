@@ -586,7 +586,7 @@ onMounted(() => {
           <div class="flex justify-between items-center border-b border-surface-container-high pb-3">
             <span class="font-body-md text-body-md text-on-surface-variant">Loại đơn</span>
             <span class="font-body-md text-body-md text-on-background font-semibold">
-              {{ getOrderType === 0 ? 'Tại quầy' : 'Giao hàng' }}
+              {{ getOrderType === 0 ? 'Tại quầy' : (getOrderType === 1 ? 'Giao hàng' : 'Online') }}
             </span>
           </div>
           <div class="flex justify-between items-center pb-1">
