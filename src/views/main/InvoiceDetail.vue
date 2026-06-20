@@ -35,6 +35,20 @@ const formatPriceVND = (price) => {
   return new Intl.NumberFormat('vi-VN').format(price) + ' đ'
 }
 
+const formatPrintDate = (dateString) => {
+  if (!dateString) return 'Ngày — tháng — năm —'
+  try {
+    const d = new Date(dateString)
+    if (isNaN(d.getTime())) return dateString
+    const day = d.getDate()
+    const month = d.getMonth() + 1
+    const year = d.getFullYear()
+    return `Ngày ${day} tháng ${month} năm ${year}`
+  } catch (e) {
+    return dateString
+  }
+}
+
 const formatDateTime = (dateString) => {
   if (!dateString) return '—'
   try {
@@ -382,7 +396,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto space-y-gutter pb-16 print:p-0">
+  <div class="invoice-detail-wrapper">
+    <!-- Screen only container -->
+    <div class="max-w-7xl mx-auto space-y-gutter pb-16 print:hidden">
     <!-- Header Section -->
     <div class="flex justify-between items-start mb-stack-lg print:hidden">
       <div>
@@ -657,7 +673,7 @@ onMounted(() => {
               >
                 <td class="py-4 px-4 font-body-md text-body-md text-on-background text-center">{{ index + 1 }}</td>
                 <td class="py-4 px-4 font-body-md text-body-md text-on-background font-semibold">
-                  {{ item.maBienThe || item.maSanPham || item.ma || 'SP00003' }}
+                  {{ item.maChiTietSanPham || item.maBienThe || item.maSanPham || item.ma || 'N/A' }}
                 </td>
                 <td class="py-4 px-4 font-body-md text-body-md text-on-background">
                   {{ item.tenSanPham || item.productName || 'Sản phẩm' }}
@@ -856,16 +872,185 @@ onMounted(() => {
     <button @click="toast.show = false" class="ml-4 text-gray-400 hover:text-gray-600 cursor-pointer">
       <span class="material-symbols-outlined text-sm">close</span>
     </button>
+  </div> <!-- Close of screen-only-container -->
+
+  <!-- Print only container -->
+  <div v-if="detail" class="print-invoice-container hidden print:block bg-white text-black p-10 font-sans max-w-[800px] mx-auto">
+    <!-- Store Name & Date -->
+    <div class="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
+      <div>
+        <h1 class="text-3xl font-extrabold tracking-tight uppercase text-black">BEE STYLISH</h1>
+        <p class="text-xs text-gray-500 uppercase mt-1 tracking-wider">Cửa hàng thời trang cao cấp</p>
+      </div>
+      <div class="text-right">
+        <p class="text-base font-bold text-black">{{ formatPrintDate(getCreatedDate) }}</p>
+        <p class="text-sm text-gray-600 mt-1">Mã hóa đơn: <span class="font-bold text-black">{{ getInvoiceCode }}</span></p>
+      </div>
+    </div>
+
+    <!-- Two column Info -->
+    <div class="grid grid-cols-2 gap-12 mb-8">
+      <!-- Col 1: Customer Info -->
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-black border-b border-gray-200 pb-2 mb-3">HÓA ĐƠN ĐƯỢC GỬI CHO:</h3>
+        <div class="space-y-1 text-sm text-gray-800">
+          <p class="font-bold text-black">{{ getCustomerName }}</p>
+          <p v-if="getCustomerPhone && getCustomerPhone !== '—'">Số điện thoại: {{ getCustomerPhone }}</p>
+          <p v-if="getDeliveryAddress && getDeliveryAddress !== '—'" class="leading-relaxed">Địa chỉ: {{ getDeliveryAddress }}</p>
+          <p v-if="getCustomerEmail && getCustomerEmail !== '—'">Email: {{ getCustomerEmail }}</p>
+        </div>
+      </div>
+      
+      <!-- Col 2: Invoice Metadata -->
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-black border-b border-gray-200 pb-2 mb-3">THÔNG TIN HÓA ĐƠN:</h3>
+        <div class="space-y-1 text-sm text-gray-800">
+          <p><strong>Loại đơn hàng:</strong> {{ getOrderType === 0 ? 'Bán trực tiếp tại quầy' : 'Đơn hàng giao tận nơi' }}</p>
+          <p><strong>Thanh toán:</strong> {{ getPaymentMethod }}</p>
+          <p><strong>Nhân viên tạo:</strong> {{ getEmployeeName }}</p>
+          <p v-if="getInvoiceNote && getInvoiceNote !== '—'"><strong>Ghi chú:</strong> {{ getInvoiceNote }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Items Table -->
+    <table class="w-full text-left border-collapse border-y border-black mb-8">
+      <thead>
+        <tr class="border-b border-black text-xs font-bold uppercase text-black">
+          <th class="py-3 pr-4">HẠNG MỤC</th>
+          <th class="py-3 px-4 text-center w-24">SỐ LƯỢNG</th>
+          <th class="py-3 px-4 text-right w-32">ĐƠN GIÁ</th>
+          <th class="py-3 pl-4 text-right w-32">TỔNG CỘNG</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 text-sm text-gray-800">
+        <tr v-for="(item, index) in getProducts" :key="item.id || index">
+          <td class="py-4 pr-4">
+            <span class="font-bold text-black">{{ item.tenSanPham || 'Sản phẩm' }}</span>
+            <div class="text-xs text-gray-500 mt-0.5">
+              Mã biến thể: {{ item.maChiTietSanPham || item.maBienThe || item.maSanPham || item.ma || 'N/A' }} | 
+              Kích cỡ: {{ item.tenKichCo || item.tenKichThuoc || '—' }} | 
+              Màu sắc: {{ item.tenMauSac || '—' }}
+            </div>
+          </td>
+          <td class="py-4 px-4 text-center">{{ item.soLuong || 0 }}</td>
+          <td class="py-4 px-4 text-right">{{ formatPriceVND(item.donGiaSauGiam || item.donGia) }}</td>
+          <td class="py-4 pl-4 text-right font-semibold text-black">
+            {{ formatPriceVND((item.donGiaSauGiam || item.donGia) * (item.soLuong || 0)) }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Footer & Totals -->
+    <div class="grid grid-cols-12 gap-6 items-start">
+      <!-- Left: Thank you message -->
+      <div class="col-span-6">
+        <p class="text-lg font-bold italic text-black">Xin cảm ơn!</p>
+        <p class="text-xs text-gray-500 mt-1">Chúc quý khách có trải nghiệm mua sắm tuyệt vời cùng Bee Stylish.</p>
+      </div>
+      
+      <!-- Right: Invoice totals -->
+      <div class="col-span-6">
+        <table class="w-full text-sm text-gray-800 border-collapse">
+          <tbody>
+            <tr class="border-b border-gray-100">
+              <td class="py-2 pr-4 text-left font-semibold text-black">Tổng phụ:</td>
+              <td class="py-2 pl-4 text-right">{{ formatPriceVND(getGoodsTotal) }}</td>
+            </tr>
+            <tr v-if="getDiscountAmount > 0" class="border-b border-gray-100">
+              <td class="py-2 pr-4 text-left font-semibold text-black">Giảm giá:</td>
+              <td class="py-2 pl-4 text-right text-red-600">-{{ formatPriceVND(getDiscountAmount) }}</td>
+            </tr>
+            <tr v-if="getShipFee > 0" class="border-b border-gray-100">
+              <td class="py-2 pr-4 text-left font-semibold text-black">Phí vận chuyển:</td>
+              <td class="py-2 pl-4 text-right">{{ formatPriceVND(getShipFee) }}</td>
+            </tr>
+            <tr class="border-t-2 border-black">
+              <td class="py-3 pr-4 text-left font-bold text-lg text-black">Tổng cộng:</td>
+              <td class="py-3 pl-4 text-right font-bold text-lg text-black">{{ formatPriceVND(getPayableTotal) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Bottom contact footer -->
+    <div class="border-t border-gray-200 mt-16 pt-6 text-center text-xs text-gray-500 space-y-1">
+      <p>Cửa hàng thời trang cao cấp Bee Stylish</p>
+      <p>Địa chỉ: Đường Trịnh Văn Bô, Phương Canh, Nam Từ Liêm, Hà Nội</p>
+      <p>Hotline: +84 912 345 678 | Email: contact@bestylish.vn</p>
+    </div>
   </div>
+</div> <!-- Close of invoice-detail-wrapper -->
 </template>
 
 <style scoped>
 .card-shadow {
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05);
 }
+</style>
+
+<style>
 @media print {
-  body {
+  /* Hide sidebar and header of the parent layout */
+  nav, header, .print\:hidden {
+    display: none !important;
+  }
+  
+  /* Reset layout margins for print */
+  .ml-\[260px\], .ml-\[80px\] {
+    margin-left: 0 !important;
+  }
+  
+  /* Reset main padding and margin */
+  main {
+    padding: 0 !important;
+    margin-top: 0 !important;
+  }
+  
+  body, #app, .bg-\[\#F8F9FA\] {
+    background: white !important;
     background-color: white !important;
   }
+  
+  .max-w-7xl {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Force background colors to print if any */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Styling for on-screen print layout verification */
+.force-print-test nav, .force-print-test header, .force-print-test .print\:hidden {
+  display: none !important;
+}
+.force-print-test .ml-\[260px\], .force-print-test .ml-\[80px\] {
+  margin-left: 0 !important;
+}
+.force-print-test main {
+  padding: 0 !important;
+  margin-top: 0 !important;
+}
+.force-print-test body, .force-print-test #app, .force-print-test .bg-\[\#F8F9FA\] {
+  background: white !important;
+  background-color: white !important;
+}
+.force-print-test .max-w-7xl {
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.force-print-test .print-invoice-container {
+  display: block !important;
+}
+.force-print-test .screen-only-container {
+  display: none !important;
 }
 </style>
