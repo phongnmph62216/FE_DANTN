@@ -54,14 +54,14 @@ const isActiveRoute = (path) => {
 
       <!-- Navigation Links -->
       <ul class="flex flex-col gap-1 flex-grow overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-surface-variant/20 scrollbar-track-transparent">
-        <!-- Trang chủ (Active when route.path === '/') -->
+        <!-- Trang chủ (Active when route.path === '/admin') -->
         <li>
           <RouterLink
-            to="/"
+            to="/admin"
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
             class="flex items-center gap-3 py-3 rounded-lg font-bold transition-all shadow-sm"
-            :style="isActiveRoute('/') ? 'background-image: linear-gradient(to right, #FFB74D, #EF972D); color: #ffffff;' : 'color: rgba(211, 228, 254, 0.8);'"
-            :class-active="isActiveRoute('/') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
+            :style="isActiveRoute('/admin') ? 'background-image: linear-gradient(to right, #FFB74D, #EF972D); color: #ffffff;' : 'color: rgba(211, 228, 254, 0.8);'"
+            :class-active="isActiveRoute('/admin') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
           >
             <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
             <span class="font-body-md text-body-md font-semibold whitespace-nowrap" v-show="sidebarExpanded">Trang chủ</span>

@@ -3,12 +3,14 @@ import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AuthLayout from './layouts/AuthLayout.vue'
 import DashboardLayout from './layouts/DashboardLayout.vue'
+import CustomerLayout from './layouts/CustomerLayout.vue'
 
 const route = useRoute()
 
 const layouts = {
   AuthLayout,
   DashboardLayout,
+  CustomerLayout,
 }
 
 const layout = computed(() => {

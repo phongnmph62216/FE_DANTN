@@ -56,6 +56,10 @@
   --spacing-base: 8px;
   --spacing-sidebar-width: 260px;
   --spacing-stack-sm: 4px;
+  --spacing-margin-mobile: 20px;
+  --spacing-margin-desktop: 40px;
+  --spacing-section-gap: 80px;
+  --spacing-container-max: 1440px;
 
   --font-headline-md: "Hanken Grotesk", sans-serif;
   --font-label-sm: "Hanken Grotesk", sans-serif;

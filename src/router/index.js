@@ -1,4 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import CustomerHomeView from '../views/main/CustomerHomeView.vue'
+import ProductDetailView from '../views/main/ProductDetailView.vue'
+import CartView from '../views/main/CartView.vue'
+import CheckoutView from '../views/main/CheckoutView.vue'
+import AllProductsView from '../views/main/AllProductsView.vue'
+import VnpayReturnView from '../views/main/VnpayReturnView.vue'
 import HomeView from '../views/main/HomeView.vue'
 import ProductList from '../views/main/ProductList.vue'
 import ProductVariantList from '../views/main/ProductVariantList.vue'
@@ -21,7 +27,43 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
+      name: 'customer-home',
+      component: CustomerHomeView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/product/:id',
+      name: 'product-detail',
+      component: ProductDetailView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/cart',
+      name: 'cart',
+      component: CartView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/checkout',
+      name: 'checkout',
+      component: CheckoutView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/all-products',
+      name: 'all-products',
+      component: AllProductsView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/vnpay-return',
+      name: 'vnpay-return',
+      component: VnpayReturnView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/admin',
+      name: 'admin-home',
       component: HomeView,
       meta: { layout: 'DashboardLayout' },
     },
