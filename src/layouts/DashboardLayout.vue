@@ -1,8 +1,16 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+
+const handleLogout = () => {
+  authStore.logout()
+  router.push('/auth')
+}
 
 // State to expand/collapse sidebar
 const sidebarExpanded = ref(true)
@@ -365,11 +373,12 @@ const isActiveRoute = (path) => {
           <span class="font-body-md whitespace-nowrap" v-show="sidebarExpanded">Thu gọn</span>
         </button>
         <button
+          @click="handleLogout"
           :class="sidebarExpanded ? 'px-4' : 'px-0'"
-          class="w-full flex items-center justify-center gap-2 py-3 bg-surface-variant/10 hover:bg-surface-variant/20 text-surface-bright rounded-lg transition-colors font-body-md font-semibold group"
+          class="w-full flex items-center justify-center gap-2 py-3 bg-surface-variant/10 hover:bg-surface-variant/20 text-surface-bright rounded-lg transition-colors font-body-md font-semibold group cursor-pointer"
         >
           <span class="material-symbols-outlined group-hover:-translate-x-1 transition-transform">logout</span>
-          <span class="whitespace-nowrap" v-show="sidebarExpanded">Logout</span>
+          <span class="whitespace-nowrap" v-show="sidebarExpanded">Đăng xuất</span>
         </button>
       </div>
     </nav>
@@ -401,7 +410,7 @@ const isActiveRoute = (path) => {
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuDB9BDjKZNGg7RYSTuluq9Bm2i8A09TR7KVgMbJ8E7SNh6ICgs9ruWENb93tFQ3kPuF0Ktc8pNCkhtzE6XkUtprrh2eb7Ew-2MN6bjHGKh2VCn93eKLDX1ctOjv4BLKQncfirKP374z70_kaaU7xaQ62XzMrkZQ0V52AWquSIMaxCwn5XiQhQqqZxdWpAARchrxYUZdVtNW1FC8Sh9alRiaTX75eDJ7vHJ_u2Yhs8LwOPauLSj9thFrq23Tn-Sgz73P92iYxOcOl64"
             />
             <div class="flex flex-col items-start">
-              <span class="font-label-sm text-on-surface leading-tight">Nguyễn Minh Phong</span>
+              <span class="font-label-sm text-on-surface leading-tight">{{ authStore.user?.hoTen || 'Quản trị viên' }}</span>
             </div>
             <span class="material-symbols-outlined text-on-surface-variant text-[20px]">keyboard_arrow_down</span>
           </div>

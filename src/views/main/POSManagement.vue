@@ -4,8 +4,13 @@ import { useRouter } from 'vue-router'
 import { Html5Qrcode } from 'html5-qrcode'
 import api from '../../services/api'
 import PaymentModal from '../../components/PaymentModal.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const loggedInEmployeeName = computed(() => {
+  return authStore.user?.hoTen || 'Nhân viên'
+})
 
 // ---------------- TOAST & CONFIRMATION STATES ----------------
 const toast = ref({ show: false, message: '', type: 'success' })
@@ -2173,7 +2178,7 @@ onUnmounted(async () => {
     <div class="flex items-center justify-between mb-6">
       <div class="flex flex-col">
         <h1 class="text-3xl font-bold text-[#0D2533] font-headline-md tracking-tight">Bán hàng</h1>
-        <p class="text-sm text-gray-500">Người bán: Trần Tuấn Linh</p>
+        <p class="text-sm text-gray-500">Người bán: {{ loggedInEmployeeName }}</p>
       </div>
       <button 
         @click="createNewOrder"

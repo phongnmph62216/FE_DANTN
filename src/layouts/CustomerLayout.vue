@@ -1,5 +1,43 @@
 <script setup>
-import { RouterLink } from 'vue-router'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const showAccountMenu = ref(false)
+const showMobileMenu = ref(false)
+
+const toggleAccountMenu = (event) => {
+  event.stopPropagation()
+  showAccountMenu.value = !showAccountMenu.value
+  showMobileMenu.value = false
+}
+
+const toggleMobileMenu = (event) => {
+  event.stopPropagation()
+  showMobileMenu.value = !showMobileMenu.value
+  showAccountMenu.value = false
+}
+
+const closeAllMenus = () => {
+  showAccountMenu.value = false
+  showMobileMenu.value = false
+}
+
+const handleLogout = () => {
+  authStore.logout()
+  closeAllMenus()
+  router.push('/')
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeAllMenus)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeAllMenus)
+})
 </script>
 
 <template>
@@ -37,10 +75,64 @@ import { RouterLink } from 'vue-router'
           <button class="text-on-surface hover:text-primary transition-colors duration-300 lg:hidden">
             <span class="material-symbols-outlined">search</span>
           </button>
-          <!-- Route to admin view since login is not yet implemented -->
-          <RouterLink class="text-on-surface hover:text-primary transition-colors duration-300 hidden md:block" to="/admin" title="Admin Console">
-            <span class="material-symbols-outlined">person</span>
-          </RouterLink>
+          <!-- User Account Menu -->
+          <div class="relative hidden md:block">
+            <button 
+              @click.stop="toggleAccountMenu"
+              class="text-on-surface hover:text-primary transition-colors duration-300 flex items-center justify-center cursor-pointer" 
+              title="Tài khoản"
+            >
+              <span class="material-symbols-outlined">person</span>
+            </button>
+            
+            <!-- Dropdown Menu -->
+            <div 
+              v-if="showAccountMenu"
+              @click.stop
+              class="absolute right-0 mt-2 w-72 bg-surface border border-outline-variant/30 rounded-lg shadow-xl py-6 px-5 z-50 text-center transition-all duration-300"
+            >
+              <template v-if="!authStore.isLoggedIn">
+                <h4 class="text-label-sm font-bold text-on-surface uppercase tracking-wider mb-1">CHÀO MỪNG QUÝ KHÁCH ĐẾN VỚI BEE STYLISH</h4>
+                <p class="text-[12px] text-on-surface-variant mb-4">Đăng nhập tài khoản của Quý Khách</p>
+                <RouterLink 
+                  to="/auth" 
+                  @click="closeAllMenus"
+                  class="block w-full bg-primary hover:bg-primary/95 text-on-primary text-label-sm font-bold uppercase py-2.5 rounded transition-colors mb-5 cursor-pointer"
+                >
+                  ĐĂNG NHẬP
+                </RouterLink>
+                <div class="border-t border-outline-variant/30 my-4"></div>
+                <h4 class="text-label-sm font-bold text-on-surface uppercase tracking-wider mb-1">ĐĂNG KÝ THÀNH VIÊN</h4>
+                <p class="text-[12px] text-on-surface-variant mb-4">Nhận ngay ưu đãi khi mua hàng online</p>
+                <RouterLink 
+                  to="/auth" 
+                  @click="closeAllMenus"
+                  class="block w-full border border-primary text-primary hover:bg-primary/5 text-label-sm font-bold uppercase py-2.5 rounded transition-all cursor-pointer"
+                >
+                  ĐĂNG KÝ
+                </RouterLink>
+              </template>
+              <template v-else>
+                <h4 class="text-label-sm font-bold text-on-surface uppercase tracking-wider mb-1">XIN CHÀO</h4>
+                <p class="text-body-md font-medium text-primary mb-2">{{ authStore.user?.hoTen }}</p>
+                <p class="text-[12px] text-on-surface-variant mb-4">Vai trò: {{ authStore.isCustomer ? 'Khách hàng' : (authStore.isManager ? 'Quản lý' : 'Nhân viên') }}</p>
+                <RouterLink 
+                  v-if="authStore.isAdminOrStaff" 
+                  to="/admin" 
+                  @click="closeAllMenus"
+                  class="block w-full bg-secondary text-on-secondary hover:bg-secondary/90 text-label-sm font-bold uppercase py-2.5 rounded transition-colors mb-3 cursor-pointer"
+                >
+                  HỆ THỐNG QUẢN TRỊ
+                </RouterLink>
+                <button 
+                  @click="handleLogout" 
+                  class="block w-full bg-primary hover:bg-primary/95 text-on-primary text-label-sm font-bold uppercase py-2.5 rounded transition-colors cursor-pointer"
+                >
+                  ĐĂNG XUẤT
+                </button>
+              </template>
+            </div>
+          </div>
           <RouterLink class="text-on-surface hover:text-primary transition-colors duration-300 relative group" to="/cart">
             <span class="material-symbols-outlined group-hover:scale-110 transition-transform">shopping_bag</span>
             <span class="absolute -top-1 -right-1 bg-primary-container text-on-primary text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">1</span>
@@ -65,11 +157,42 @@ import { RouterLink } from 'vue-router'
           <span class="material-symbols-outlined">favorite</span>
           <span class="text-[10px] uppercase font-bold">Yêu thích</span>
         </a>
-        <!-- Route to admin view since login is not yet implemented -->
-        <RouterLink class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors" to="/admin">
-          <span class="material-symbols-outlined">person</span>
-          <span class="text-[10px] uppercase font-bold">Cá nhân</span>
-        </RouterLink>
+        <!-- User Account Menu on Mobile -->
+        <template v-if="!authStore.isLoggedIn">
+          <RouterLink class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors" to="/auth">
+            <span class="material-symbols-outlined">person</span>
+            <span class="text-[10px] uppercase font-bold">Cá nhân</span>
+          </RouterLink>
+        </template>
+        <template v-else>
+          <div class="relative flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer select-none" @click.stop="toggleMobileMenu">
+            <span class="material-symbols-outlined">person</span>
+            <span class="text-[10px] uppercase font-bold truncate max-w-[60px]">{{ authStore.user?.hoTen?.split(' ').pop() || 'Cá nhân' }}</span>
+            
+            <!-- Mobile Account Dropup -->
+            <div 
+              v-if="showMobileMenu" 
+              @click.stop
+              class="fixed bottom-[70px] right-4 bg-surface border border-outline-variant/30 rounded-lg shadow-xl p-4 z-50 w-56 text-center"
+            >
+              <p class="text-xs text-on-surface-variant mb-2">Xin chào, {{ authStore.user?.hoTen }}</p>
+              <RouterLink 
+                v-if="authStore.isAdminOrStaff" 
+                to="/admin" 
+                @click="closeAllMenus"
+                class="block w-full bg-secondary text-on-secondary text-xs font-bold uppercase py-2 rounded mb-2"
+              >
+                Quản trị
+              </RouterLink>
+              <button 
+                @click="handleLogout" 
+                class="block w-full bg-primary text-on-primary text-xs font-bold uppercase py-2 rounded cursor-pointer"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </template>
       </nav>
 
       <!-- Main Content Slot -->

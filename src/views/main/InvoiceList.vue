@@ -456,7 +456,7 @@ onMounted(() => {
                 {{ item.maHoaDon || item.ma || '-' }}
               </td>
               <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface">
-                {{ item.tenNhanVien || item.nhanVien || '-' }}
+                {{ item.tenNhanVien || item.nhanVien || '' }}
               </td>
               <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface">
                 {{ item.tenKhachHang || item.khachHang || 'Khách lẻ' }}

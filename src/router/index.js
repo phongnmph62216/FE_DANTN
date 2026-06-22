@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import CustomerHomeView from '../views/main/CustomerHomeView.vue'
+import AuthView from '../views/main/AuthView.vue'
 import ProductDetailView from '../views/main/ProductDetailView.vue'
 import CartView from '../views/main/CartView.vue'
 import CheckoutView from '../views/main/CheckoutView.vue'
@@ -21,6 +22,7 @@ import EmployeeAdd from '../views/main/EmployeeAdd.vue'
 import InvoiceList from '../views/main/InvoiceList.vue'
 import InvoiceDetail from '../views/main/InvoiceDetail.vue'
 import POSManagement from '../views/main/POSManagement.vue'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,6 +31,12 @@ const router = createRouter({
       path: '/',
       name: 'customer-home',
       component: CustomerHomeView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/auth',
+      name: 'auth',
+      component: AuthView,
       meta: { layout: 'CustomerLayout' },
     },
     {
@@ -200,6 +208,48 @@ const router = createRouter({
       meta: { layout: 'DashboardLayout' },
     },
   ],
+})
+
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+
+  // Các route yêu cầu quyền admin/nhân viên
+  const adminRoutes = [
+    '/admin',
+    '/products',
+    '/attributes',
+    '/vouchers',
+    '/discounts',
+    '/customers',
+    '/employees',
+    '/invoices',
+    '/pos'
+  ]
+
+  const requiresAdmin = adminRoutes.some(path => to.path === path || to.path.startsWith(path + '/'))
+  const requiresAuth = ['/checkout'].some(path => to.path === path || to.path.startsWith(path + '/'))
+
+  if (requiresAdmin) {
+    if (!authStore.isLoggedIn || !authStore.isAdminOrStaff) {
+      return next({ name: 'auth' })
+    }
+  }
+
+  if (requiresAuth) {
+    if (!authStore.isLoggedIn) {
+      return next({ name: 'auth' })
+    }
+  }
+
+  if (to.name === 'auth' && authStore.isLoggedIn) {
+    if (authStore.isAdminOrStaff) {
+      return next({ name: 'admin-home' })
+    } else {
+      return next({ name: 'customer-home' })
+    }
+  }
+
+  next()
 })
 
 export default router

@@ -402,112 +402,76 @@ const handleCancel = () => {
   )
 }
 
-// Validate fields
+// Validate fields (Đã gỡ bỏ hardcode từ khóa và chất liệu mùa vụ)
 const validateForm = () => {
   let isValid = true
   errors.value = { productName: '', brand: '', type: '' }
   const missingFields = []
 
-  // 1. Tên sản phẩm: Phải chứa các từ khóa liên quan đến áo nam mùa hè, độ dài từ 6 đến 100 ký tự
-  if (!productName.value.trim()) {
+  // 1. Tên sản phẩm: Chỉ kiểm tra rỗng và giới hạn độ dài
+  const trimmedName = productName.value.trim()
+  if (!trimmedName) {
     errors.value.productName = 'Tên sản phẩm không được để trống.'
     missingFields.push('Tên sản phẩm')
     isValid = false
-  } else {
-    const nameLower = productName.value.trim().toLowerCase()
-    const summerKeywords = ['áo thun', 'áo phông', 'áo sơ mi', 'áo polo', 'áo ba lỗ', 'áo cộc', 'áo ngắn tay', 'áo sát nách', 'áo hawaii', 'áo đi biển', 'tank top', 'tanktop']
-    const hasKeyword = summerKeywords.some(keyword => nameLower.includes(keyword))
-    if (!hasKeyword) {
-      errors.value.productName = 'Tên sản phẩm phải chứa từ khóa liên quan đến áo nam mùa hè (áo thun, sơ mi, polo, ba lỗ, cộc tay, v.v.).'
-      missingFields.push('Từ khóa áo nam mùa hè (áo thun, sơ mi, polo, ba lỗ, cộc tay...)')
-      isValid = false
-    } else if (productName.value.trim().length < 6 || productName.value.trim().length > 100) {
-      errors.value.productName = 'Độ dài tên sản phẩm phải từ 6 đến 100 ký tự.'
-      missingFields.push('Độ dài Tên sản phẩm (6-100 ký tự)')
+  } else if (trimmedName.length < 5 || trimmedName.length > 255) {
+    errors.value.productName = 'Độ dài tên sản phẩm phải từ 5 đến 255 ký tự.'
+    missingFields.push('Độ dài Tên sản phẩm (5-255 ký tự)')
+    isValid = false
+  }
+
+  // 2. Kiểm tra các trường dropdown bắt buộc
+  const requiredDropdowns = [
+    { value: selectedBrand.value, name: 'Thương hiệu' },
+    { value: selectedOrigin.value, name: 'Xuất xứ' },
+    { value: selectedType.value, name: 'Loại sản phẩm' },
+    { value: selectedStyle.value, name: 'Kiểu dáng' },
+    { value: selectedMaterial.value, name: 'Chất liệu' },
+    { value: selectedCollar.value, name: 'Cổ áo' },
+    { value: selectedSleeve.value, name: 'Tay áo' },
+    { value: selectedShoulder.value, name: 'Vai áo' }
+  ]
+
+  requiredDropdowns.forEach(field => {
+    if (!field.value) {
+      missingFields.push(field.name)
       isValid = false
     }
-  }
+  })
 
-  // 2. Kiểm tra thương hiệu, xuất xứ, loại áo, kiểu dáng
-  if (!selectedBrand.value) {
-    missingFields.push('Thương hiệu')
-    isValid = false
-  }
-  if (!selectedOrigin.value) {
-    missingFields.push('Xuất xứ')
-    isValid = false
-  }
-  if (!selectedType.value) {
-    missingFields.push('Loại áo')
-    isValid = false
-  }
-  if (!selectedStyle.value) {
-    missingFields.push('Kiểu dáng')
-    isValid = false
-  }
-
-  // 3. Chất liệu: Mùa hè không dùng chất liệu nóng như Len, Nỉ, Dạ, Phao
-  if (!selectedMaterial.value) {
-    missingFields.push('Chất liệu')
-    isValid = false
-  } else {
-    const materialObj = materials.value.find(m => m.id == selectedMaterial.value)
-    if (materialObj) {
-      const matName = materialObj.name.toLowerCase()
-      const winterMaterials = ['len', 'nỉ', 'dạ', 'phao', 'giữ nhiệt']
-      const isWinterMat = winterMaterials.some(m => matName.includes(m))
-      if (isWinterMat) {
-        missingFields.push(`Chất liệu phù hợp mùa hè (Hiện chọn "${materialObj.name}" không phù hợp)`)
-        isValid = false
-      }
-    }
-  }
-
-  // 4. Các bộ phận cấu tạo áo
-  if (!selectedCollar.value) {
-    missingFields.push('Cổ áo')
-    isValid = false
-  }
-  if (!selectedSleeve.value) {
-    missingFields.push('Tay áo')
-    isValid = false
-  }
-  if (!selectedShoulder.value) {
-    missingFields.push('Vai áo')
-    isValid = false
-  }
-
-  // 5. Yêu cầu ít nhất 1 hình ảnh sản phẩm chính
+  // 3. Yêu cầu ít nhất 1 hình ảnh sản phẩm chính
   if (productImages.value.length === 0) {
     missingFields.push('Hình ảnh chính sản phẩm (yêu cầu ít nhất 1 ảnh)')
     isValid = false
   }
 
+  // 4. Hiển thị thông báo
   if (!isValid) {
-    showToast('Vui lòng kiểm tra thông tin hợp lệ:\n- ' + missingFields.join('\n- '), 'error')
+    const displayFields = missingFields.slice(0, 5)
+    const extraCount = missingFields.length - 5
+    const toastMsg = 'Vui lòng kiểm tra thông tin hợp lệ:\n- ' + displayFields.join('\n- ') + (extraCount > 0 ? `\n...và ${extraCount} trường khác.` : '')
+    
+    showToast(toastMsg, 'error')
   }
 
   return isValid
 }
 
-// Save action
+// Save action (Đã nới lỏng tồn kho = 0, giá = 0 và cho phép xả kho cắt lỗ)
 const handleSave = async () => {
   if (!validateForm()) {
     return
   }
 
-  // Flatten generatedColorGroups into danhSachBienThe flat array format required by BE
   const danhSachBienThe = []
   let variantsValid = true
   const variantErrors = []
 
-  // Check each color group & variants
   for (const g of generatedColorGroups.value) {
     const colorImage = g.images[0] || ''
     
-    // Yêu cầu mỗi nhóm màu phải có ít nhất 1 ảnh
     if (!colorImage) {
-      variantErrors.push(`Màu "${g.color.name}" chưa có hình ảnh biến thể. Mỗi màu phải có ít nhất 1 hình ảnh minh họa.`)
+      variantErrors.push(`Màu "${g.color.name}" chưa có hình ảnh. Mỗi màu cần 1 ảnh minh họa.`)
       variantsValid = false
       break
     }
@@ -517,23 +481,21 @@ const handleSave = async () => {
       const importPrice = Number(v.importPrice)
       const salePrice = Number(v.salePrice)
 
-      if (isNaN(stock) || stock <= 0 || stock > 10000) {
-        variantErrors.push(`Màu ${g.color.name} - Size ${v.size.name}: Số lượng tồn kho phải từ 1 đến 10,000.`)
+      // Cho phép tồn kho >= 0 (Tạo trước thông tin, hàng nhập sau)
+      if (isNaN(stock) || stock < 0 || stock > 10000) {
+        variantErrors.push(`Màu ${g.color.name} - Size ${v.size.name}: Tồn kho phải từ 0 đến 10,000.`)
         variantsValid = false
         break
       }
-      if (isNaN(importPrice) || importPrice < 10000) {
-        variantErrors.push(`Màu ${g.color.name} - Size ${v.size.name}: Giá nhập phải từ 10,000 VNĐ trở lên.`)
+      
+      // Cho phép giá >= 0 (Phòng trường hợp làm hàng tặng kèm 0đ)
+      if (isNaN(importPrice) || importPrice < 0) {
+        variantErrors.push(`Màu ${g.color.name} - Size ${v.size.name}: Giá nhập không được để âm.`)
         variantsValid = false
         break
       }
-      if (isNaN(salePrice) || salePrice < 20000) {
-        variantErrors.push(`Màu ${g.color.name} - Size ${v.size.name}: Giá bán phải từ 20,000 VNĐ trở lên.`)
-        variantsValid = false
-        break
-      }
-      if (salePrice < importPrice) {
-        variantErrors.push(`Màu ${g.color.name} - Size ${v.size.name}: Giá bán phải lớn hơn hoặc bằng giá nhập (để tránh bán lỗ).`)
+      if (isNaN(salePrice) || salePrice < 0) {
+        variantErrors.push(`Màu ${g.color.name} - Size ${v.size.name}: Giá bán không được để âm.`)
         variantsValid = false
         break
       }
@@ -564,7 +526,6 @@ const handleSave = async () => {
   triggerConfirm(
     'Bạn có chắc chắn muốn lưu sản phẩm này không?',
     async () => {
-      // Construct save payload matching BE specification
       const payload = {
         maSanPham: sku.value.trim() || null,
         tenSanPham: productName.value.trim(),
@@ -580,8 +541,6 @@ const handleSave = async () => {
         idVaiAo: Number(selectedShoulder.value) || null,
         danhSachBienThe: danhSachBienThe
       }
-
-      console.log('Product Save Payload:', payload)
 
       try {
         const res = await api.post('/api/v1/san-pham', payload)

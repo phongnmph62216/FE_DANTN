@@ -14,7 +14,18 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    // TODO: attach auth token here
+    try {
+      const userStr = localStorage.getItem('auth_user')
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        if (user && user.id) {
+          config.headers['X-Employee-Id'] = user.id
+          config.headers['X-User-Id'] = user.id
+        }
+      }
+    } catch (e) {
+      console.error('Error attaching auth user headers', e)
+    }
     return config
   },
   (error) => Promise.reject(error),

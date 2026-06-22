@@ -104,7 +104,7 @@ const getCreatedDate = computed(() => {
 
 const getEmployeeName = computed(() => {
   if (!detail.value) return ''
-  return detail.value.nguoiTao || detail.value.tenNhanVien || detail.value.nhanVien || 'Hệ thống'
+  return detail.value.nguoiTao || detail.value.tenNhanVien || detail.value.nhanVien || ''
 })
 
 // Customer Info
@@ -546,7 +546,7 @@ onMounted(() => {
               <span v-if="detail.tenPhieuGiamGia" class="font-normal block text-[10px] text-orange-600">{{ detail.tenPhieuGiamGia }}</span>
             </span>
           </div>
-          <div class="flex justify-between items-center" v-if="getOrderType === 1">
+          <div class="flex justify-between items-center" v-if="getOrderType === 1 || getOrderType === 2">
             <span class="font-body-md text-body-md text-on-surface-variant">Phí vận chuyển</span>
             <span class="font-body-md text-body-md text-on-background font-medium">
               + {{ formatPriceVND(getShipFee) }}
