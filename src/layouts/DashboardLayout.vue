@@ -12,6 +12,78 @@ const handleLogout = () => {
   router.push('/auth')
 }
 
+// Notifications state and functions
+import { onMounted, onUnmounted } from 'vue'
+import api from '@/services/api'
+
+const notifications = ref([])
+const unreadCount = ref(0)
+const showNotificationsPanel = ref(false)
+
+const fetchNotifications = async () => {
+  try {
+    const resCount = await api.get('/api/v1/thong-bao/chua-doc/count')
+    unreadCount.value = resCount.data?.data || 0
+
+    const resList = await api.get('/api/v1/thong-bao')
+    notifications.value = resList.data?.data || []
+  } catch (error) {
+    console.error('Error fetching notifications:', error)
+  }
+}
+
+const toggleNotificationsPanel = (event) => {
+  event.stopPropagation()
+  showNotificationsPanel.value = !showNotificationsPanel.value
+}
+
+const closeNotificationsPanel = () => {
+  showNotificationsPanel.value = false
+}
+
+const handleNotificationClick = async (notif) => {
+  try {
+    await api.put(`/api/v1/thong-bao/${notif.id}/da-doc`)
+    await fetchNotifications()
+    router.push(`/invoices/${notif.idHoaDon}`)
+    closeNotificationsPanel()
+  } catch (error) {
+    console.error('Error marking notification as read:', error)
+  }
+}
+
+const markAllAsRead = async () => {
+  try {
+    await api.put('/api/v1/thong-bao/da-doc-tat-ca')
+    await fetchNotifications()
+  } catch (error) {
+    console.error('Error marking all as read:', error)
+  }
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit'
+  })
+}
+
+let pollInterval = null
+onMounted(() => {
+  fetchNotifications()
+  pollInterval = setInterval(fetchNotifications, 10000)
+  document.addEventListener('click', closeNotificationsPanel)
+})
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval)
+  document.removeEventListener('click', closeNotificationsPanel)
+})
+
 // State to expand/collapse sidebar
 const sidebarExpanded = ref(true)
 
@@ -395,11 +467,66 @@ const isActiveRoute = (path) => {
       >
         <div class="flex items-center gap-6">
           <!-- Actions -->
-          <div class="flex items-center gap-2">
-            <button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-all cursor-pointer relative group">
+          <div class="flex items-center gap-2 relative">
+            <button 
+              @click.stop="toggleNotificationsPanel"
+              class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-all cursor-pointer relative group flex items-center justify-center"
+            >
               <span class="material-symbols-outlined group-hover:text-primary transition-colors">notifications</span>
-              <span class="absolute top-2 right-2 w-2 h-2 bg-gradient-to-r from-[#FFB74D] to-[#EF972D] rounded-full border-2 border-surface-container-lowest"></span>
+              <span 
+                v-if="unreadCount > 0"
+                class="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-[#FFB74D] to-[#EF972D] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-surface-container-lowest scale-90"
+              >
+                {{ unreadCount }}
+              </span>
             </button>
+
+            <!-- Notifications Dropdown Panel -->
+            <div 
+              v-if="showNotificationsPanel"
+              @click.stop
+              class="absolute right-0 top-12 w-80 bg-surface border border-outline-variant/30 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-96"
+            >
+              <div class="p-4 bg-surface border-b border-outline-variant/30 flex justify-between items-center">
+                <span class="font-bold text-sm text-on-surface flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-[18px]">notifications</span>
+                  Thông báo ({{ unreadCount }})
+                </span>
+                <button 
+                  v-if="unreadCount > 0"
+                  @click="markAllAsRead"
+                  class="text-xs text-primary hover:underline font-semibold cursor-pointer"
+                >
+                  Đánh dấu đã đọc
+                </button>
+              </div>
+
+              <!-- List -->
+              <div class="overflow-y-auto flex-1 divide-y divide-outline-variant/20 scrollbar-thin max-h-80">
+                <div v-if="notifications.length === 0" class="p-6 text-center text-xs text-on-surface-variant">
+                  Không có thông báo nào.
+                </div>
+                <div 
+                  v-for="notif in notifications" 
+                  :key="notif.id"
+                  @click="handleNotificationClick(notif)"
+                  class="p-3.5 hover:bg-surface-container-low transition-colors cursor-pointer flex gap-3 items-start"
+                  :class="{ 'bg-surface-container-lowest': notif.trangThai === 0 }"
+                >
+                  <div class="mt-1.5 flex-shrink-0">
+                    <span 
+                      class="block w-2.5 h-2.5 rounded-full"
+                      :class="notif.trangThai === 0 ? 'bg-primary' : 'bg-outline-variant/40'"
+                    ></span>
+                  </div>
+                  <div class="flex-1 flex flex-col gap-0.5">
+                    <h5 class="text-xs font-bold text-on-surface line-clamp-1 text-left">{{ notif.tieuDe }}</h5>
+                    <p class="text-[11px] text-on-surface-variant leading-relaxed line-clamp-2 text-left">{{ notif.noiDung }}</p>
+                    <span class="text-[10px] text-on-surface-variant/60 mt-1 text-left">{{ formatDate(notif.ngayTao) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="h-8 w-px bg-surface-container-high mx-2"></div>
           <!-- User Profile Dropdown -->

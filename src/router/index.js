@@ -6,6 +6,7 @@ import CartView from '../views/main/CartView.vue'
 import CheckoutView from '../views/main/CheckoutView.vue'
 import AllProductsView from '../views/main/AllProductsView.vue'
 import VnpayReturnView from '../views/main/VnpayReturnView.vue'
+import OrderLookupView from '../views/main/OrderLookupView.vue'
 import HomeView from '../views/main/HomeView.vue'
 import ProductList from '../views/main/ProductList.vue'
 import ProductVariantList from '../views/main/ProductVariantList.vue'
@@ -67,6 +68,12 @@ const router = createRouter({
       path: '/vnpay-return',
       name: 'vnpay-return',
       component: VnpayReturnView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/tra-cuu',
+      name: 'order-lookup',
+      component: OrderLookupView,
       meta: { layout: 'CustomerLayout' },
     },
     {

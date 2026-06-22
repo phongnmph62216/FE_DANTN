@@ -22,7 +22,8 @@ const form = ref({
   ngaySinh: '',
   anhDaiDien: '', // Keeps UI premium
   trangThai: 1,
-  diaChiMacDinh: ''
+  diaChiMacDinh: '',
+  matKhau: ''
 })
 
 // Address list
@@ -205,7 +206,8 @@ const loadCustomerDetails = async (id) => {
         ngaySinh: data.ngaySinh || '',
         anhDaiDien: '', // API does not return photo, keep blank
         trangThai: data.trangThai || 1,
-        diaChiMacDinh: ''
+        diaChiMacDinh: '',
+        matKhau: ''
       }
       
       diaChiList.value = data.danhSachDiaChi || []
@@ -545,7 +547,8 @@ const saveCustomer = async () => {
     email: form.value.email,
     gioiTinh: form.value.gioiTinh === 'Nam' ? 1 : 0,
     ngaySinh: form.value.ngaySinh || null,
-    trangThai: form.value.trangThai
+    trangThai: form.value.trangThai,
+    matKhau: form.value.matKhau || null
   }
 
   triggerConfirm(
@@ -762,6 +765,18 @@ const saveCustomer = async () => {
               class="w-full px-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all"
               placeholder="Nhập số điện thoại"
               required
+            />
+          </div>
+
+          <!-- Mật khẩu -->
+          <div class="space-y-1">
+            <label class="block text-sm font-semibold text-on-surface">Mật khẩu <span v-if="!isEdit" class="text-error">*</span></label>
+            <input 
+              type="password" 
+              v-model="form.matKhau" 
+              class="w-full px-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all"
+              :placeholder="isEdit ? 'Nhập để thay đổi mật khẩu' : 'Nhập mật khẩu (mặc định: 123456)'"
+              :required="!isEdit"
             />
           </div>
 

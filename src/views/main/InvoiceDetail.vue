@@ -390,6 +390,49 @@ const handleBackToList = () => {
   router.push('/invoices')
 }
 
+// Cancellation request approval state and methods
+const showApprovalModal = ref(false)
+const isAgreeCancel = ref(true)
+const approvalNote = ref('')
+const isProcessingApproval = ref(false)
+
+const openApprovalModal = (agree) => {
+  isAgreeCancel.value = agree
+  approvalNote.value = ''
+  showApprovalModal.value = true
+}
+
+const closeApprovalModal = () => {
+  showApprovalModal.value = false
+}
+
+const submitApproval = async () => {
+  if (!approvalNote.value.trim()) {
+    showToast('Vui lòng nhập ghi chú phản hồi!', 'error')
+    return
+  }
+
+  isProcessingApproval.value = true
+  try {
+    await api.put(`/api/v1/ban-hang/don-hang/${invoiceId}/phe-duyet-huy`, null, {
+      params: {
+        dongY: isAgreeCancel.value,
+        ghiChu: approvalNote.value.trim()
+      }
+    })
+    
+    showToast(isAgreeCancel.value ? 'Đã chấp nhận hủy đơn hàng!' : 'Đã từ chối hủy đơn hàng!', 'success')
+    showApprovalModal.value = false
+    await loadInvoiceDetails()
+  } catch (error) {
+    console.error('Error approving cancellation:', error)
+    const msg = error.response?.data?.message || 'Có lỗi xảy ra khi duyệt yêu cầu hủy.'
+    showToast(msg, 'error')
+  } finally {
+    isProcessingApproval.value = false
+  }
+}
+
 onMounted(() => {
   loadInvoiceDetails()
 })
@@ -439,6 +482,38 @@ onMounted(() => {
     </div>
 
     <div v-else class="grid grid-cols-12 gap-gutter">
+      <!-- Cancellation Request Alert (Span 12) -->
+      <div 
+        v-if="detail && detail.trangThaiYeuCauHuy === 1" 
+        class="col-span-12 bg-amber-50 border border-amber-200 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 card-shadow"
+      >
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-amber-600 text-3xl animate-pulse">warning</span>
+          <div class="text-left">
+            <h3 class="font-bold text-amber-800 text-base">Khách hàng yêu cầu hủy đơn hàng</h3>
+            <p class="text-sm text-amber-700 mt-1">
+              Lý do: <span class="font-semibold italic">"{{ detail.ghiChu || 'Không có lý do cụ thể' }}"</span>
+            </p>
+          </div>
+        </div>
+        <div class="flex gap-3 w-full md:w-auto mt-2 md:mt-0">
+          <button 
+            @click="openApprovalModal(false)" 
+            class="flex-1 md:flex-none px-4 py-2 border border-amber-300 hover:bg-amber-100 text-amber-800 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+            :disabled="isProcessingApproval"
+          >
+            Từ chối hủy
+          </button>
+          <button 
+            @click="openApprovalModal(true)" 
+            class="flex-1 md:flex-none px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm"
+            :disabled="isProcessingApproval"
+          >
+            Đồng ý hủy đơn
+          </button>
+        </div>
+      </div>
+
       <!-- Order Status Card (Span 8) -->
       <div class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl card-shadow p-6 relative print:col-span-12">
         <div class="flex items-center gap-2 mb-8">
@@ -872,7 +947,65 @@ onMounted(() => {
     <button @click="toast.show = false" class="ml-4 text-gray-400 hover:text-gray-600 cursor-pointer">
       <span class="material-symbols-outlined text-sm">close</span>
     </button>
-  </div> <!-- Close of screen-only-container -->
+  </div>
+
+  <!-- Cancellation Approval Modal -->
+  <div 
+    v-if="showApprovalModal" 
+    class="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm"
+  >
+    <div 
+      class="bg-surface rounded-2xl shadow-2xl border border-outline-variant/30 max-w-md w-full overflow-hidden"
+    >
+      <div 
+        class="px-6 py-4 text-white flex justify-between items-center"
+        :class="isAgreeCancel ? 'bg-red-600' : 'bg-amber-600'"
+      >
+        <h3 class="font-bold text-lg flex items-center gap-2">
+          <span class="material-symbols-outlined">gavel</span>
+          {{ isAgreeCancel ? 'Đồng ý hủy đơn hàng' : 'Từ chối hủy đơn hàng' }}
+        </h3>
+        <button @click="closeApprovalModal" class="text-white hover:opacity-80 transition-opacity">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      
+      <div class="p-6 text-left">
+        <p class="text-sm text-on-surface-variant mb-4">
+          {{ isAgreeCancel ? 'Hành động này sẽ hủy đơn hàng và hoàn trả số lượng tồn kho của các sản phẩm trong đơn.' : 'Hành động này sẽ từ chối yêu cầu hủy đơn từ khách hàng và tiếp tục quy trình xử lý đơn.' }}
+        </p>
+        
+        <label class="block text-label-sm font-semibold text-on-surface mb-2">Ghi chú thao tác <span class="text-red-500">*</span></label>
+        <textarea 
+          v-model="approvalNote"
+          placeholder="Nhập ghi chú phản hồi khách hàng..." 
+          rows="3"
+          class="w-full bg-surface border border-outline-variant rounded-lg p-3 text-sm focus:outline-none focus:ring-1 transition-colors"
+          :class="isAgreeCancel ? 'focus:border-red-500 focus:ring-red-500' : 'focus:border-amber-500 focus:ring-amber-500'"
+          required
+        ></textarea>
+      </div>
+      
+      <div class="px-6 py-4 bg-surface-container border-t border-outline-variant/20 flex justify-end gap-3">
+        <button 
+          @click="closeApprovalModal" 
+          class="px-4 py-2 border border-outline-variant hover:bg-surface-container rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+          :disabled="isProcessingApproval"
+        >
+          Hủy bỏ
+        </button>
+        <button 
+          @click="submitApproval" 
+          class="px-5 py-2 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center gap-2"
+          :class="isAgreeCancel ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'"
+          :disabled="isProcessingApproval"
+        >
+          <span v-if="isProcessingApproval" class="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
+          Xác nhận
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Print only container -->
   <div v-if="detail" class="print-invoice-container hidden print:block bg-white text-black p-10 font-sans max-w-[800px] mx-auto">

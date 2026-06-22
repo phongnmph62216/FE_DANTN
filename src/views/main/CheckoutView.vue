@@ -410,6 +410,7 @@ const submitOrder = async (e) => {
       isGiaoHang: true,
       tenNguoiNhan: fullName.value.trim(),
       sdtNguoiNhan: phone.value.trim(),
+      email: email.value.trim(),
       diaChiChiTiet: fullAddress,
       phiVanChuyen: shippingFee.value
     })

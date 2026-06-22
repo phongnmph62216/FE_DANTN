@@ -60,7 +60,7 @@ onUnmounted(() => {
           <RouterLink to="/all-products" class="text-label-sm font-label-sm uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors duration-300 border-b-2 border-transparent pb-1" exact-active-class="text-primary !border-primary">SẢN PHẨM</RouterLink>
           <a class="text-label-sm font-label-sm uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors duration-300 border-b-2 border-transparent pb-1" href="#">ƯU ĐÃI</a>
           <a class="text-label-sm font-label-sm uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors duration-300 border-b-2 border-transparent pb-1" href="#">MỚI VỀ</a>
-          <a class="text-label-sm font-label-sm uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors duration-300 border-b-2 border-transparent pb-1" href="#">TRA CỨU</a>
+          <RouterLink to="/tra-cuu" class="text-label-sm font-label-sm uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors duration-300 border-b-2 border-transparent pb-1" exact-active-class="text-primary !border-primary">TRA CỨU</RouterLink>
           <a class="text-label-sm font-label-sm uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors duration-300 border-b-2 border-transparent pb-1" href="#">VỀ CHÚNG TÔI</a>
         </nav>
         <!-- Search & Actions -->
