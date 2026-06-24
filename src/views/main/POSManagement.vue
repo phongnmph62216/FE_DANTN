@@ -791,55 +791,62 @@ const fetchOrderDetail = async (orderId) => {
 // ---------------- ORDERS MANAGEMENT ACTIONS ----------------
 const createNewOrder = async () => {
   if (orders.value.length >= 10) {
-    showToast('Tối đa chỉ được tạo 10 đơn hàng chờ cùng lúc!', 'error')
+    showToast('Không thể tạo thêm! Tối đa chỉ được phép mở 10 đơn hàng chờ cùng lúc để tránh spam hệ thống.', 'error')
     return
   }
-  isLoading.value = true
-  try {
-    if (isUsingMock.value) {
-      const nextId = orders.value.length ? Math.max(...orders.value.map(o => o.id)) + 1 : 1
-      const newOrder = {
-        id: nextId,
-        maHoaDon: `HD-${String(nextId).padStart(3, '0')}`,
-        tenKhachHang: 'Khách lẻ',
-        soDienThoai: '',
-        khachHang: null,
-        chiTietList: [],
-        loaiHoaDon: 0,
-        trangThai: 0,
-        phiVanChuyen: 0,
-        diaChiGiao: '',
-        tinhThanhPho: '',
-        quanHuyen: '',
-        phuongXa: '',
-        tenNguoiNhan: '',
-        sdtNguoiNhan: '',
-        voucher: null,
-        soTienGoc: 0,
-        soTienGiam: 0,
-        tongTienThanhToan: 0,
-        khachThanhToan: 0,
-        tienMat: 0,
-        tienChuyenKhoan: 0,
-        ghiChuThanhToan: ''
+
+  triggerConfirm(
+    'Bạn có chắc chắn muốn tạo thêm một đơn hàng chờ mới không?',
+    async () => {
+      isLoading.value = true
+      try {
+        if (isUsingMock.value) {
+          const nextId = orders.value.length ? Math.max(...orders.value.map(o => o.id)) + 1 : 1
+          const newOrder = {
+            id: nextId,
+            maHoaDon: `HD-${String(nextId).padStart(3, '0')}`,
+            tenKhachHang: 'Khách lẻ',
+            soDienThoai: '',
+            khachHang: null,
+            chiTietList: [],
+            loaiHoaDon: 0,
+            trangThai: 0,
+            phiVanChuyen: 0,
+            diaChiGiao: '',
+            tinhThanhPho: '',
+            quanHuyen: '',
+            phuongXa: '',
+            tenNguoiNhan: '',
+            sdtNguoiNhan: '',
+            voucher: null,
+            soTienGoc: 0,
+            soTienGiam: 0,
+            tongTienThanhToan: 0,
+            khachThanhToan: 0,
+            tienMat: 0,
+            tienChuyenKhoan: 0,
+            ghiChuThanhToan: ''
+          }
+          orders.value.push(newOrder)
+          saveMockOrders(orders.value)
+          activeOrderId.value = nextId
+          showToast('Đã tạo đơn hàng chờ mới (Mock)!', 'success')
+        } else {
+          const res = await api.post('/api/v1/ban-hang/tao-don')
+          if (res.data) {
+            showToast('Tạo đơn hàng chờ thành công!', 'success')
+            await loadOrders()
+            activeOrderId.value = res.data.id
+          }
+        }
+      } catch (err) {
+        showToast('Không thể tạo đơn hàng chờ mới!', 'error')
+      } finally {
+        isLoading.value = false
       }
-      orders.value.push(newOrder)
-      saveMockOrders(orders.value)
-      activeOrderId.value = nextId
-      showToast('Đã tạo đơn hàng chờ mới (Mock)!', 'success')
-    } else {
-      const res = await api.post('/api/v1/ban-hang/tao-don')
-      if (res.data) {
-        showToast('Tạo đơn hàng chờ thành công!', 'success')
-        await loadOrders()
-        activeOrderId.value = res.data.id
-      }
-    }
-  } catch (err) {
-    showToast('Không thể tạo đơn hàng chờ mới!', 'error')
-  } finally {
-    isLoading.value = false
-  }
+    },
+    'Tạo đơn hàng mới'
+  )
 }
 
 const closeOrderTab = (order) => {
@@ -903,7 +910,7 @@ const getMaxAllowedQuantity = (item) => {
   return Math.max(0, totalStock - qtyInOtherOrders)
 }
 
-const changeQuantity = async (item, delta) => {
+const changeQuantity = async (item, delta, customSuccessMessage = null) => {
   const oldQuantity = item.soLuong
   const newQty = oldQuantity + delta
   if (newQty < 1) {
@@ -922,6 +929,22 @@ const changeQuantity = async (item, delta) => {
   // 1. Save old quantity and turn on loading state
   item.isLoading = true
 
+  // Optimistic update of variant stock in modal list
+  let variantInModal = null
+  if (!isUsingMock.value) {
+    variantInModal = productVariants.value.find(v => v.id === item.variantId)
+    if (variantInModal) {
+      variantInModal.stock = Math.max(0, variantInModal.stock - delta)
+    }
+  }
+
+  // Determine Toast message
+  const direction = delta > 0 ? 'Tăng' : 'Giảm'
+  const actionText = delta > 0 ? 'thêm' : 'bớt'
+  const absDelta = Math.abs(delta)
+  const defaultMsg = `Đã ${direction.toLowerCase()} số lượng ${item.tenSanPham} (${item.color} - ${item.size}) ${actionText} ${absDelta} sản phẩm (Tổng cộng: ${newQty})!`
+  const successMsg = customSuccessMessage || defaultMsg
+
   // 2. Call API or update state
   if (isUsingMock.value) {
     item.soLuong = newQty
@@ -929,6 +952,7 @@ const changeQuantity = async (item, delta) => {
     calculatePrices(currentOrder.value)
     saveOrdersState()
     await autoApplyBestVoucher(currentOrder.value)
+    showToast(successMsg, 'success')
     item.isLoading = false
   } else {
     try {
@@ -941,13 +965,19 @@ const changeQuantity = async (item, delta) => {
       item.thanhTien = item.donGia * newQty
       await fetchOrderDetail(activeOrderId.value)
       await autoApplyBestVoucher(currentOrder.value)
-      showToast('Cập nhật số lượng thành công!', 'success')
+      showToast(successMsg, 'success')
+      // Silently refetch variants to ensure accurate stock in modal
+      await fetchProductModalVariants(true)
     } catch (err) {
       // Failure / Out of stock: show error message from BE and rollback
       const errorMsg = err.response?.data?.message || 'Không thể đồng bộ số lượng sản phẩm lên máy chủ!'
       showToast(errorMsg, 'error')
       item.soLuong = oldQuantity
       item.thanhTien = item.donGia * oldQuantity
+      // Rollback variant stock in modal list
+      if (variantInModal) {
+        variantInModal.stock = variantInModal.stock + delta
+      }
     } finally {
       item.isLoading = false
     }
@@ -972,6 +1002,16 @@ const updateQuantityInput = async (item, event) => {
   // 1. Save old quantity and turn on loading state
   item.isLoading = true
 
+  const delta = inputVal - oldQuantity
+  // Optimistic update of variant stock in modal list
+  let variantInModal = null
+  if (!isUsingMock.value) {
+    variantInModal = productVariants.value.find(v => v.id === item.variantId)
+    if (variantInModal) {
+      variantInModal.stock = Math.max(0, variantInModal.stock - delta)
+    }
+  }
+
   // 2. Call API or update state
   if (isUsingMock.value) {
     item.soLuong = inputVal
@@ -979,6 +1019,7 @@ const updateQuantityInput = async (item, event) => {
     calculatePrices(currentOrder.value)
     saveOrdersState()
     await autoApplyBestVoucher(currentOrder.value)
+    showToast(`Đã cập nhật số lượng ${item.tenSanPham} (${item.color} - ${item.size}) thành ${inputVal} sản phẩm!`, 'success')
     item.isLoading = false
   } else {
     try {
@@ -991,7 +1032,9 @@ const updateQuantityInput = async (item, event) => {
       item.thanhTien = item.donGia * inputVal
       await fetchOrderDetail(activeOrderId.value)
       await autoApplyBestVoucher(currentOrder.value)
-      showToast('Cập nhật số lượng thành công!', 'success')
+      showToast(`Đã cập nhật số lượng ${item.tenSanPham} (${item.color} - ${item.size}) thành ${inputVal} sản phẩm!`, 'success')
+      // Silently refetch variants to ensure accurate stock in modal
+      await fetchProductModalVariants(true)
     } catch (err) {
       // Failure: show error message from BE and rollback
       const errorMsg = err.response?.data?.message || 'Không thể cập nhật số lượng sản phẩm!'
@@ -1000,6 +1043,10 @@ const updateQuantityInput = async (item, event) => {
       item.thanhTien = item.donGia * oldQuantity
       if (event.target) {
         event.target.value = oldQuantity
+      }
+      // Rollback variant stock in modal list
+      if (variantInModal) {
+        variantInModal.stock = variantInModal.stock + delta
       }
     } finally {
       item.isLoading = false
@@ -1012,13 +1059,23 @@ const removeCartItem = (item) => {
     `Bạn có chắc chắn muốn xóa sản phẩm "${item.tenSanPham}" khỏi giỏ hàng không?`,
     async () => {
       item.isLoading = true
+
+      // Optimistic update of variant stock in modal list
+      let variantInModal = null
+      if (!isUsingMock.value) {
+        variantInModal = productVariants.value.find(v => v.id === item.variantId)
+        if (variantInModal) {
+          variantInModal.stock = variantInModal.stock + item.soLuong
+        }
+      }
+
       if (isUsingMock.value) {
         if (currentOrder.value) {
           currentOrder.value.chiTietList = currentOrder.value.chiTietList.filter(i => i.id !== item.id)
           calculatePrices(currentOrder.value)
           saveOrdersState()
           await autoApplyBestVoucher(currentOrder.value)
-          showToast('Đã xóa sản phẩm khỏi giỏ hàng (Mock)!', 'success')
+          showToast(`Đã xóa sản phẩm ${item.tenSanPham} (${item.color} - ${item.size}) khỏi giỏ hàng (Mock)!`, 'success')
         }
         item.isLoading = false
       } else {
@@ -1029,10 +1086,16 @@ const removeCartItem = (item) => {
           }
           await fetchOrderDetail(activeOrderId.value)
           await autoApplyBestVoucher(currentOrder.value)
-          showToast('Đã xóa sản phẩm khỏi giỏ hàng!', 'success')
+          showToast(`Đã xóa sản phẩm ${item.tenSanPham} (${item.color} - ${item.size}) khỏi giỏ hàng!`, 'success')
+          // Silently refetch variants to ensure accurate stock in modal
+          await fetchProductModalVariants(true)
         } catch (err) {
           const errorMsg = err.response?.data?.message || 'Xóa sản phẩm thất bại!'
           showToast(errorMsg, 'error')
+          // Rollback variant stock in modal list
+          if (variantInModal) {
+            variantInModal.stock = Math.max(0, variantInModal.stock - item.soLuong)
+          }
         } finally {
           item.isLoading = false
         }
@@ -1077,8 +1140,8 @@ const loadFilterOptions = async () => {
   }
 }
 
-const fetchProductModalVariants = async () => {
-  isProductLoading.value = true
+const fetchProductModalVariants = async (silent = false) => {
+  if (!silent) isProductLoading.value = true
   try {
     const params = {
       page: 0,
@@ -1170,8 +1233,8 @@ const addVariantToCart = async (variant) => {
       showToast(`Không thể thêm! Số lượng trong giỏ hàng đã đạt giới hạn tồn kho khả dụng (${maxAllowed}).`, 'error')
       return
     }
-    await changeQuantity(existing, 1)
-    showToast('Tăng số lượng sản phẩm thành công!', 'success')
+    const msg = `Đã thêm 1 sản phẩm ${variant.tenSanPham} (${variant.color} - ${variant.size}) vào giỏ hàng (Tổng cộng: ${existing.soLuong + 1})!`
+    await changeQuantity(existing, 1, msg)
     return
   }
 
@@ -1205,7 +1268,13 @@ const addVariantToCart = async (variant) => {
   calculatePrices(currentOrder.value)
   saveOrdersState()
 
-  showToast('Đã thêm sản phẩm vào giỏ hàng!', 'success')
+  // Optimistic update of variant stock in modal list
+  if (!isUsingMock.value) {
+    variant.stock = Math.max(0, variant.stock - 1)
+  }
+
+  const successMsg = `Đã thêm 1 sản phẩm ${variant.tenSanPham} (${variant.color} - ${variant.size}) vào giỏ hàng!`
+  showToast(successMsg, 'success')
 
   if (!isUsingMock.value) {
     try {
@@ -1215,11 +1284,18 @@ const addVariantToCart = async (variant) => {
       })
       await fetchOrderDetail(currentOrder.value.id)
       await autoApplyBestVoucher(currentOrder.value)
+      // Silently refetch variants to ensure accurate stock in modal
+      await fetchProductModalVariants(true)
     } catch (err) {
       console.warn('Failed to sync added product to API server:', err.message)
       showToast('Không thể thêm sản phẩm lên máy chủ!', 'error')
+      // Rollback local cart
       currentOrder.value.chiTietList = currentOrder.value.chiTietList.filter(i => i.variantId !== variant.id)
       calculatePrices(currentOrder.value)
+      // Rollback variant stock in modal list
+      if (!isUsingMock.value) {
+        variant.stock = variant.stock + 1
+      }
     }
   } else {
     await autoApplyBestVoucher(currentOrder.value)
