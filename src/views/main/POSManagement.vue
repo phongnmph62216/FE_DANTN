@@ -2679,7 +2679,7 @@ onUnmounted(async () => {
                 <button 
                   @click="confirmCheckoutOrder"
                   class="w-full py-4 bg-[#ef972d] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#ef972d]/90 transition-all uppercase tracking-wider mt-4 cursor-pointer"
-                >Xác nhận đặt hàng</button>
+                >Xác nhận thanh toán</button>
               </div>
 
             </div>

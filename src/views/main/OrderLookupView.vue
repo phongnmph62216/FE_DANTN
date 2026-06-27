@@ -126,6 +126,15 @@ const formatCurrency = (val) => {
   return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
 }
 
+const formatImage = (url) => {
+  if (!url) return 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=150'
+  if (url.startsWith('data:image/') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+  return `${apiBase.replace(/\/$/, '')}/${url.replace(/^\//, '')}`
+}
+
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
@@ -149,6 +158,56 @@ const getStatusText = (status) => {
     case 5: return 'Đã hủy'
     default: return 'Không xác định'
   }
+}
+
+// Payment Status Check
+const isOrderPaid = (orderObj) => {
+  if (!orderObj || !orderObj.lichSuThanhToan || orderObj.lichSuThanhToan.length === 0) return false
+  const totalPaid = orderObj.lichSuThanhToan.reduce((sum, pay) => sum + (pay.soTien || 0), 0)
+  return totalPaid >= orderObj.tongTien
+}
+
+// Order type helper
+const getOrderTypeLabel = (orderObj) => {
+  if (!orderObj) return 'Chưa xác định'
+  if (orderObj.loaiDon === 0) return 'Tại quầy'
+  if (orderObj.loaiDon === 1) return 'Giao hàng'
+  if (orderObj.loaiDon === 2) return 'Online'
+  return 'Chưa xác định'
+}
+
+// Payment method helper
+const getPaymentMethodLabel = (orderObj) => {
+  if (!orderObj) return 'Chưa xác định'
+  
+  const payList = orderObj.lichSuThanhToan
+  if (!payList || payList.length === 0) {
+    if (orderObj.loaiDon === 1 || orderObj.loaiDon === 2) {
+      return 'COD'
+    }
+    return 'Chưa thanh toán'
+  }
+  
+  const methods = new Set()
+  payList.forEach(p => {
+    const pt = p.phuongThuc
+    const note = (p.ghiChu || '').toUpperCase()
+    if (pt === '1') {
+      methods.add('Tiền mặt')
+    } else if (pt === '2') {
+      if (note.includes('VNPAY')) {
+        methods.add('QR VNPAY')
+      } else {
+        methods.add('Chuyển khoản')
+      }
+    } else if (pt === 'COD') {
+      methods.add('COD')
+    } else {
+      methods.add(pt)
+    }
+  })
+  
+  return Array.from(methods).join(' + ')
 }
 
 // Steps for the stepper
@@ -343,8 +402,8 @@ const steps = [
                 <!-- Image placeholder / thumbnail -->
                 <div class="w-16 h-20 bg-surface rounded-lg overflow-hidden border border-outline-variant/20 flex-shrink-0 flex items-center justify-center">
                   <img 
-                    v-if="item.anh" 
-                    :src="item.anh" 
+                    v-if="item.anhSanPham" 
+                    :src="formatImage(item.anhSanPham)" 
                     class="w-full h-full object-cover" 
                     alt="product image"
                   />
@@ -355,7 +414,7 @@ const steps = [
                 <div class="flex-1 flex flex-col justify-between">
                   <div>
                     <h5 class="text-sm font-bold text-on-surface line-clamp-2">{{ item.tenSanPham }}</h5>
-                    <p class="text-xs text-on-surface-variant mt-1">Phân loại: {{ item.tenMauSac }}, {{ item.tenKichThuoc }}</p>
+                    <p class="text-xs text-on-surface-variant mt-1">Phân loại: {{ item.tenMauSac }}, {{ item.tenKichCo }}</p>
                   </div>
                   <div class="flex justify-between items-center mt-2">
                     <span class="text-xs text-on-surface-variant">Số lượng: <span class="font-bold text-on-surface">{{ item.soLuong }}</span></span>
@@ -375,10 +434,27 @@ const steps = [
               <span class="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
               Tổng Kết Tài Chính
             </h4>
-            <div class="flex flex-col gap-3 text-sm border-b border-outline-variant/20 pb-4 mb-4">
-              <div class="flex justify-between"><span class="text-on-surface-variant">Tổng tiền hàng:</span> <span class="font-semibold text-on-surface">{{ formatCurrency(order.tongTienHang) }}</span></div>
-              <div class="flex justify-between" v-if="order.giamGia > 0"><span class="text-on-surface-variant">Giảm giá:</span> <span class="font-semibold text-red-500">-{{ formatCurrency(order.giamGia) }}</span></div>
-              <div class="flex justify-between"><span class="text-on-surface-variant">Phí vận chuyển:</span> <span class="font-semibold text-on-surface">{{ formatCurrency(order.phiVanChuyen) }}</span></div>
+            <div class="flex flex-col gap-3 text-sm border-b border-outline-variant/20 pb-4 mb-4 text-on-surface-variant">
+              <div class="flex justify-between"><span>Tổng tiền hàng:</span> <span class="font-semibold text-on-surface">{{ formatCurrency(order.tongTienHang) }}</span></div>
+              <div class="flex justify-between" v-if="order.giamGia > 0"><span>Giảm giá:</span> <span class="font-semibold text-red-500">-{{ formatCurrency(order.giamGia) }}</span></div>
+              <div class="flex justify-between"><span>Phí vận chuyển:</span> <span class="font-semibold text-on-surface">{{ formatCurrency(order.phiVanChuyen) }}</span></div>
+              <div class="flex justify-between">
+                <span>Loại đơn hàng:</span> 
+                <span class="font-bold text-on-surface">{{ getOrderTypeLabel(order) }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Phương thức thanh toán:</span> 
+                <span class="font-bold text-on-surface">{{ getPaymentMethodLabel(order) }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>Trạng thái thanh toán:</span> 
+                <span 
+                  :class="isOrderPaid(order) ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-gray-500 bg-gray-50 border-gray-100'"
+                  class="text-xs font-bold px-2 py-0.5 rounded border"
+                >
+                  {{ isOrderPaid(order) ? 'Đã thanh toán' : 'Chưa thanh toán' }}
+                </span>
+              </div>
             </div>
             <div class="flex justify-between items-center mb-2">
               <span class="text-sm font-bold text-on-surface">Tổng thanh toán:</span>

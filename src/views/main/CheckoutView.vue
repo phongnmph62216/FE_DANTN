@@ -31,6 +31,7 @@ const appliedVoucher = ref(null)
 const voucherError = ref('')
 const voucherSuccess = ref('')
 const orderNumber = ref('')
+const showConfirmModal = ref(false)
 
 // Payment steps: 'checkout', 'success'
 const checkoutStep = ref('checkout')
@@ -372,21 +373,31 @@ const validateForm = () => {
 }
 
 // Handle Order Submission
-const submitOrder = async (e) => {
-  e.preventDefault()
+const submitOrder = (e) => {
+  if (e) e.preventDefault()
   paymentError.value = ''
-  isProcessingPayment.value = true
   
   if (!validateForm()) {
-    isProcessingPayment.value = false
     return
   }
 
   if (cartItems.value.length === 0) {
     alert('Giỏ hàng của bạn đang trống!')
-    isProcessingPayment.value = false
     return
   }
+
+  // Guest must pay online via VNPAY
+  if (!authStore.isLoggedIn) {
+    paymentMethod.value = 'VNPAY'
+  }
+
+  showConfirmModal.value = true
+}
+
+const confirmSubmitOrder = async () => {
+  showConfirmModal.value = false
+  paymentError.value = ''
+  isProcessingPayment.value = true
 
   try {
     // 1. Tạo đơn hàng chờ loaiHoaDon = 2 (Online)
@@ -559,20 +570,21 @@ const selectVoucherFromModal = (v) => {
 }
 
 onMounted(async () => {
-  if (!authStore.isLoggedIn) {
-    alert('Vui lòng đăng nhập tài khoản khách hàng để tiến hành mua hàng online.')
-    router.push('/auth')
-    return
+  if (authStore.isLoggedIn) {
+    // Pre-populate details from logged in user
+    fullName.value = authStore.user?.hoTen || ''
+    email.value = authStore.user?.email || ''
+    phone.value = authStore.user?.sdt || ''
+  } else {
+    // Guest must pay online via VNPAY
+    paymentMethod.value = 'VNPAY'
   }
-
-  // Pre-populate details from logged in user
-  fullName.value = authStore.user?.hoTen || ''
-  email.value = authStore.user?.email || ''
-  phone.value = authStore.user?.sdt || ''
 
   loadCart()
   await fetchProvinces()
-  await loadCustomerAddresses()
+  if (authStore.isLoggedIn) {
+    await loadCustomerAddresses()
+  }
 })
 </script>
 
@@ -766,9 +778,26 @@ onMounted(async () => {
             </h2>
           </div>
           <div class="flex flex-col gap-4">
-            <label class="flex items-center gap-3 cursor-pointer group">
-              <input v-model="paymentMethod" value="COD" class="text-[#ef972d] focus:ring-[#ef972d] border-outline-variant h-4 w-4" name="payment_method" type="radio"/>
-              <span class="text-body-md text-on-surface group-hover:text-[#ef972d] transition-colors">Thanh toán khi nhận hàng (COD)</span>
+            <label 
+              class="flex items-start gap-3 group"
+              :class="authStore.isLoggedIn ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
+            >
+              <input 
+                v-model="paymentMethod" 
+                value="COD" 
+                :disabled="!authStore.isLoggedIn"
+                class="text-[#ef972d] focus:ring-[#ef972d] border-outline-variant h-4 w-4 mt-0.5" 
+                name="payment_method" 
+                type="radio"
+              />
+              <div class="flex flex-col">
+                <span class="text-body-md text-on-surface transition-colors" :class="authStore.isLoggedIn && 'group-hover:text-[#ef972d]'">
+                  Thanh toán khi nhận hàng (COD)
+                </span>
+                <span v-if="!authStore.isLoggedIn" class="text-xs text-red-500 font-bold mt-1 bg-red-50 border border-red-100 rounded px-2 py-1 max-w-max">
+                  Yêu cầu đăng nhập để sử dụng phương thức này nhằm hạn chế bom hàng.
+                </span>
+              </div>
             </label>
             <label class="flex items-center gap-3 cursor-pointer group">
               <input v-model="paymentMethod" value="VNPAY" class="text-[#ef972d] focus:ring-[#ef972d] border-outline-variant h-4 w-4" name="payment_method" type="radio"/>
@@ -981,6 +1010,118 @@ onMounted(async () => {
             class="px-4 py-2 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 transition-colors text-sm font-semibold"
           >
             Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Confirmation Modal -->
+    <div v-if="showConfirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col p-6 shadow-xl border border-slate-100">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+          <h3 class="text-lg font-bold text-slate-800 flex items-center gap-1.5 uppercase">
+            <span class="material-symbols-outlined text-[#ef972d]">assignment_turned_in</span>
+            Xác Nhận Thông Tin Đơn Hàng
+          </h3>
+          <button @click="showConfirmModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <!-- Modal Body: Scrollable Order Details -->
+        <div class="flex-grow overflow-y-auto pt-2 pr-1 flex flex-col gap-6 text-sm">
+          <!-- Shipping Information -->
+          <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <h4 class="font-bold text-slate-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+              <span class="material-symbols-outlined text-[#ef972d] text-lg">local_shipping</span>
+              Thông Tin Nhận Hàng
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-600">
+              <div>Họ và tên: <span class="font-semibold text-slate-800">{{ fullName }}</span></div>
+              <div>Số điện thoại: <span class="font-semibold text-slate-800">{{ phone }}</span></div>
+              <div class="sm:col-span-2">Email: <span class="font-semibold text-slate-800">{{ email }}</span></div>
+              <div class="sm:col-span-2">Địa chỉ nhận hàng: <span class="font-semibold text-slate-800">{{ address }}, {{ selectedWard }}, {{ selectedDistrict }}, {{ selectedCity }}</span></div>
+              <div class="sm:col-span-2" v-if="notes && notes.trim()">Ghi chú: <span class="font-semibold text-slate-800">{{ notes }}</span></div>
+              <div class="sm:col-span-2">Phương thức thanh toán: 
+                <span class="font-bold text-[#ef972d]">
+                  {{ paymentMethod === 'COD' ? 'Thanh toán khi nhận hàng (COD)' : 'Thanh toán online qua VNPAY' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Items -->
+          <div>
+            <h4 class="font-bold text-slate-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+              <span class="material-symbols-outlined text-[#ef972d] text-lg">shopping_basket</span>
+              Sản Phẩm Đã Chọn
+            </h4>
+            <div class="border border-slate-200 rounded-lg overflow-hidden">
+              <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                    <th class="py-2.5 px-3">Sản phẩm</th>
+                    <th class="py-2.5 px-3 text-center">SL</th>
+                    <th class="py-2.5 px-3 text-right">Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in cartItems" :key="item.variantId" class="border-b border-slate-100">
+                    <td class="py-3 px-3">
+                      <div class="flex items-center gap-3">
+                        <img class="w-10 h-12 object-cover rounded bg-slate-100 flex-shrink-0" :src="item.image" alt="Product image"/>
+                        <div>
+                          <div class="font-semibold text-slate-800 uppercase text-xs line-clamp-1">{{ item.productName }}</div>
+                          <div class="text-[11px] text-slate-500 mt-0.5">Size {{ item.size }} / {{ item.color }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="py-3 px-3 text-center text-slate-700">{{ item.quantity }}</td>
+                    <td class="py-3 px-3 text-right font-semibold text-slate-800">{{ formatCurrency(item.price * item.quantity) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Total Calculation -->
+          <div class="flex flex-col gap-2 border-t border-slate-100 pt-4 max-w-xs ml-auto w-full text-right">
+            <div class="flex justify-between text-slate-600">
+              <span>Tạm tính:</span>
+              <span class="font-medium text-slate-800">{{ formatCurrency(subtotal) }}</span>
+            </div>
+            <div class="flex justify-between text-slate-600">
+              <span>Phí vận chuyển:</span>
+              <span class="font-medium text-slate-800">{{ formatCurrency(shippingFee) }}</span>
+            </div>
+            <div class="flex justify-between text-slate-600" v-if="discountAmount > 0">
+              <span>Mã giảm giá:</span>
+              <span class="font-medium text-red-500">-{{ formatCurrency(discountAmount) }}</span>
+            </div>
+            <div class="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-800">
+              <span>Tổng thanh toán:</span>
+              <span class="text-[#ef972d] text-lg">{{ formatCurrency(totalPayment) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="mt-6 border-t border-slate-100 pt-4 flex gap-3 justify-end">
+          <button 
+            type="button"
+            @click="showConfirmModal = false" 
+            class="px-5 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 transition-colors text-sm font-semibold"
+          >
+            Quay lại
+          </button>
+          <button 
+            type="button"
+            @click="confirmSubmitOrder" 
+            class="px-5 py-2.5 bg-[#ef972d] hover:bg-[#d88523] text-white rounded transition-colors text-sm font-bold uppercase tracking-wider shadow-sm flex items-center gap-1.5"
+          >
+            <span class="material-symbols-outlined text-[18px]">done</span>
+            Xác nhận đặt hàng
           </button>
         </div>
       </div>

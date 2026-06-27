@@ -7,6 +7,7 @@ import CheckoutView from '../views/main/CheckoutView.vue'
 import AllProductsView from '../views/main/AllProductsView.vue'
 import VnpayReturnView from '../views/main/VnpayReturnView.vue'
 import OrderLookupView from '../views/main/OrderLookupView.vue'
+import MyOrdersView from '../views/main/MyOrdersView.vue'
 import HomeView from '../views/main/HomeView.vue'
 import ProductList from '../views/main/ProductList.vue'
 import ProductVariantList from '../views/main/ProductVariantList.vue'
@@ -75,6 +76,16 @@ const router = createRouter({
       name: 'order-lookup',
       component: OrderLookupView,
       meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/my-orders',
+      name: 'my-orders',
+      component: MyOrdersView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/profile',
+      redirect: '/my-orders'
     },
     {
       path: '/admin',
@@ -234,7 +245,7 @@ router.beforeEach((to, from, next) => {
   ]
 
   const requiresAdmin = adminRoutes.some(path => to.path === path || to.path.startsWith(path + '/'))
-  const requiresAuth = ['/checkout'].some(path => to.path === path || to.path.startsWith(path + '/'))
+  const requiresAuth = ['/my-orders', '/profile'].some(path => to.path === path || to.path.startsWith(path + '/'))
 
   if (requiresAdmin) {
     if (!authStore.isLoggedIn || !authStore.isAdminOrStaff) {

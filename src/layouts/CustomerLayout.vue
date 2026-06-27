@@ -116,6 +116,24 @@ onUnmounted(() => {
                 <h4 class="text-label-sm font-bold text-on-surface uppercase tracking-wider mb-1">XIN CHÀO</h4>
                 <p class="text-body-md font-medium text-primary mb-2">{{ authStore.user?.hoTen }}</p>
                 <p class="text-[12px] text-on-surface-variant mb-4">Vai trò: {{ authStore.isCustomer ? 'Khách hàng' : (authStore.isManager ? 'Quản lý' : 'Nhân viên') }}</p>
+                <div class="flex flex-col gap-2 mb-4 text-left border-t border-outline-variant/30 pt-3">
+                  <RouterLink
+                    to="/profile"
+                    @click="closeAllMenus"
+                    class="flex items-center gap-2 py-1 text-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">account_circle</span>
+                    Hồ sơ
+                  </RouterLink>
+                  <RouterLink
+                    to="/my-orders"
+                    @click="closeAllMenus"
+                    class="flex items-center gap-2 py-1 text-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">receipt_long</span>
+                    Đơn hàng của tôi
+                  </RouterLink>
+                </div>
                 <RouterLink 
                   v-if="authStore.isAdminOrStaff" 
                   to="/admin" 
@@ -176,6 +194,24 @@ onUnmounted(() => {
               class="fixed bottom-[70px] right-4 bg-surface border border-outline-variant/30 rounded-lg shadow-xl p-4 z-50 w-56 text-center"
             >
               <p class="text-xs text-on-surface-variant mb-2">Xin chào, {{ authStore.user?.hoTen }}</p>
+              <div class="flex flex-col gap-2 mb-3 text-left border-t border-b border-outline-variant/30 py-2">
+                <RouterLink
+                  to="/profile"
+                  @click="closeAllMenus"
+                  class="flex items-center gap-2 text-xs text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[16px]">account_circle</span>
+                  Hồ sơ
+                </RouterLink>
+                <RouterLink
+                  to="/my-orders"
+                  @click="closeAllMenus"
+                  class="flex items-center gap-2 text-xs text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[16px]">receipt_long</span>
+                  Đơn hàng của tôi
+                </RouterLink>
+              </div>
               <RouterLink 
                 v-if="authStore.isAdminOrStaff" 
                 to="/admin" 
