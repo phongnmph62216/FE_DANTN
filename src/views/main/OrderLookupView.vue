@@ -156,6 +156,7 @@ const getStatusText = (status) => {
     case 3: return 'Đang giao hàng'
     case 4: return 'Hoàn thành'
     case 5: return 'Đã hủy'
+    case 6: return 'Giao hàng không thành công'
     default: return 'Không xác định'
   }
 }
@@ -309,16 +310,16 @@ const steps = [
               :key="step.status" 
               class="flex flex-row md:flex-col items-center gap-4 md:gap-2 text-center"
               :class="{
-                'opacity-100': order.trangThai >= step.status && order.trangThai !== 5,
-                'opacity-50': order.trangThai < step.status || order.trangThai === 5
+                'opacity-100': order.trangThai >= step.status && order.trangThai !== 5 && order.trangThai !== 6,
+                'opacity-50': order.trangThai < step.status || order.trangThai === 5 || order.trangThai === 6
               }"
             >
               <!-- Step Icon Container -->
               <div 
                 class="w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300"
                 :class="{
-                  'bg-primary text-on-primary border-primary shadow-lg shadow-primary/20': order.trangThai >= step.status && order.trangThai !== 5,
-                  'bg-surface text-on-surface-variant border-outline-variant': order.trangThai < step.status || order.trangThai === 5
+                  'bg-primary text-on-primary border-primary shadow-lg shadow-primary/20': order.trangThai >= step.status && order.trangThai !== 5 && order.trangThai !== 6,
+                  'bg-surface text-on-surface-variant border-outline-variant': order.trangThai < step.status || order.trangThai === 5 || order.trangThai === 6
                 }"
               >
                 <span class="material-symbols-outlined text-[20px]">{{ step.icon }}</span>
@@ -328,7 +329,7 @@ const steps = [
               <div class="flex flex-col text-left md:text-center">
                 <span 
                   class="text-sm font-semibold"
-                  :class="{ 'text-primary font-bold': order.trangThai === step.status && order.trangThai !== 5 }"
+                  :class="{ 'text-primary font-bold': order.trangThai === step.status && order.trangThai !== 5 && order.trangThai !== 6 }"
                 >
                   {{ step.label }}
                 </span>
@@ -343,6 +344,15 @@ const steps = [
           <div>
             <h4 class="font-bold">Đơn hàng này đã bị hủy</h4>
             <p class="text-xs mt-1" v-if="order.ghiChu">Lý do hủy: {{ order.ghiChu }}</p>
+          </div>
+        </div>
+
+        <!-- Custom Delivery Failed Alert -->
+        <div v-if="order.trangThai === 6" class="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-3 text-rose-800">
+          <span class="material-symbols-outlined text-[28px] text-rose-500">cancel</span>
+          <div>
+            <h4 class="font-bold">Giao hàng không thành công</h4>
+            <p class="text-xs mt-1" v-if="order.ghiChu">Chi tiết: {{ order.ghiChu }}</p>
           </div>
         </div>
 

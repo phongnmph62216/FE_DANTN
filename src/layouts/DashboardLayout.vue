@@ -182,6 +182,20 @@ const isActiveRoute = (path) => {
           <div class="h-px w-8 mx-auto bg-surface-variant/20 my-3" v-show="!sidebarExpanded"></div>
         </li>
 
+        <!-- Quản lý đơn hàng -->
+        <li>
+          <RouterLink
+            to="/orders"
+            :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
+            class="flex items-center gap-3 py-3 rounded-lg font-bold transition-all shadow-sm"
+            :style="isActiveRoute('/orders') || route.path.startsWith('/orders') ? 'background-image: linear-gradient(to right, #FFB74D, #EF972D); color: #ffffff;' : 'color: rgba(211, 228, 254, 0.8);'"
+            :class-active="isActiveRoute('/orders') || route.path.startsWith('/orders') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
+          >
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">shopping_bag</span>
+            <span class="font-body-md text-body-md font-semibold whitespace-nowrap" v-show="sidebarExpanded">Quản lý đơn hàng</span>
+          </RouterLink>
+        </li>
+
         <!-- Quản lý hóa đơn -->
         <li>
           <RouterLink

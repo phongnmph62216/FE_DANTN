@@ -24,6 +24,7 @@ import EmployeeAdd from '../views/main/EmployeeAdd.vue'
 import InvoiceList from '../views/main/InvoiceList.vue'
 import InvoiceDetail from '../views/main/InvoiceDetail.vue'
 import POSManagement from '../views/main/POSManagement.vue'
+import OrderList from '../views/main/OrderList.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
@@ -214,6 +215,12 @@ const router = createRouter({
       meta: { layout: 'DashboardLayout' },
     },
     {
+      path: '/orders',
+      name: 'orders',
+      component: OrderList,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
       path: '/invoices/:id',
       name: 'invoice-detail',
       component: InvoiceDetail,
@@ -241,6 +248,7 @@ router.beforeEach((to, from, next) => {
     '/customers',
     '/employees',
     '/invoices',
+    '/orders',
     '/pos'
   ]
 

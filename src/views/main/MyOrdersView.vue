@@ -32,7 +32,8 @@ const tabs = [
   { id: '3', label: 'Đang giao' },
   { id: '2', label: 'Đã giao' },
   { id: '4', label: 'Hoàn thành' },
-  { id: '5', label: 'Đã hủy' }
+  { id: '5', label: 'Đã hủy' },
+  { id: '6', label: 'Giao thất bại' }
 ]
 
 // Cancel Request state
@@ -115,6 +116,7 @@ const getStatusLabel = (status) => {
     case 3: return 'Đang giao'
     case 4: return 'Hoàn thành'
     case 5: return 'Đã hủy'
+    case 6: return 'Giao hàng không thành công'
     default: return 'Không xác định'
   }
 }
@@ -127,6 +129,7 @@ const getStatusBadgeClass = (status) => {
     case 3: return 'bg-orange-50 text-orange-700 border border-orange-200'
     case 4: return 'bg-emerald-50 text-emerald-700 border border-emerald-200'
     case 5: return 'bg-red-50 text-red-700 border border-red-200'
+    case 6: return 'bg-rose-50 text-rose-700 border border-rose-200'
     default: return 'bg-gray-50 text-gray-700 border border-gray-200'
   }
 }

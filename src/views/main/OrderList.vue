@@ -10,7 +10,7 @@ const searchQuery = ref('')
 const startDate = ref('')
 const endDate = ref('')
 const orderType = ref('all') // 'all', '0' (Store), '1' (Online)
-const selectedStatus = ref('4,5,6') // '4,5,6' (All archived), 4 (Completed), 5 (Cancelled), 6 (Failed)
+const selectedStatus = ref('0,1,2,3') // '0,1,2,3' (All active), 0, 1, 2, 3
 
 // List state
 const invoices = ref([])
@@ -125,7 +125,7 @@ const fetchInvoices = async (page = 0) => {
     if (selectedStatus.value && selectedStatus.value !== 'all') {
       params.trangThai = selectedStatus.value
     } else {
-      params.trangThai = '4,5,6'
+      params.trangThai = '0,1,2,3'
     }
 
     const res = await api.get('/api/v1/hoa-don', { params })
@@ -143,7 +143,7 @@ const fetchInvoices = async (page = 0) => {
   } catch (err) {
     console.error('Failed to load invoices list:', err)
     fetchError.value = true
-    showToast('Không thể kết nối đến máy chủ để tải dữ liệu hóa đơn!', 'error')
+    showToast('Không thể kết nối đến máy chủ để tải dữ liệu đơn hàng!', 'error')
   } finally {
     isLoading.value = false
   }
@@ -168,7 +168,7 @@ const handleExportExcel = async () => {
     if (selectedStatus.value && selectedStatus.value !== 'all') {
       params.trangThai = selectedStatus.value
     } else {
-      params.trangThai = '4,5,6'
+      params.trangThai = '0,1,2,3'
     }
 
     const res = await api.get('/api/v1/hoa-don/export-excel', {
@@ -179,7 +179,7 @@ const handleExportExcel = async () => {
     const url = window.URL.createObjectURL(new Blob([res.data]))
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `danh_sach_hoa_don_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    link.setAttribute('download', `danh_sach_don_hang_${new Date().toISOString().slice(0, 10)}.xlsx`)
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -196,7 +196,7 @@ const resetFilters = () => {
   startDate.value = ''
   endDate.value = ''
   orderType.value = 'all'
-  selectedStatus.value = 'all'
+  selectedStatus.value = '0,1,2,3'
   fetchInvoices(0)
 }
 
@@ -258,7 +258,7 @@ onMounted(() => {
   <div class="max-w-7xl mx-auto space-y-gutter">
     <!-- Header Section -->
     <div class="mb-stack-lg">
-      <h1 class="font-display-lg text-on-surface uppercase text-gray-900 tracking-tight">QUẢN LÝ HÓA ĐƠN</h1>
+      <h1 class="font-display-lg text-on-surface uppercase text-gray-900 tracking-tight">QUẢN LÝ ĐƠN HÀNG</h1>
     </div>
 
     <!-- Filter Card -->
@@ -273,7 +273,7 @@ onMounted(() => {
       <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter">
         <!-- Search code -->
         <div class="flex flex-col gap-stack-sm">
-          <label class="font-label-sm text-label-sm text-on-surface-variant uppercase">Mã hoặc Thông tin hóa đơn</label>
+          <label class="font-label-sm text-label-sm text-on-surface-variant uppercase">Mã hoặc Thông tin đơn hàng</label>
           <div class="relative">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
               <span class="material-symbols-outlined text-[20px]">search</span>
@@ -341,7 +341,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Invoice List Table Card -->
+    <!-- Order List Table Card -->
     <div class="bg-surface-container-lowest rounded-xl p-stack-lg shadow-sm border border-outline-variant flex flex-col gap-stack-lg">
       <!-- Header & Sorting -->
       <div class="flex justify-between items-start md:items-center flex-col md:flex-row gap-stack-md">
@@ -350,7 +350,7 @@ onMounted(() => {
             <span class="material-symbols-outlined">receipt_long</span>
           </div>
           <div class="flex flex-col">
-            <h2 class="font-headline-md text-headline-md text-on-surface">Danh sách hóa đơn</h2>
+            <h2 class="font-headline-md text-headline-md text-on-surface">Danh sách đơn hàng</h2>
             <span class="font-body-md text-body-md text-on-surface-variant">Lọc nhanh theo trạng thái</span>
           </div>
         </div>
@@ -359,39 +359,46 @@ onMounted(() => {
       <!-- Quick Filter Tabs -->
       <div class="flex flex-wrap items-center gap-stack-sm">
         <button
-          @click="selectedStatus = '4,5,6'"
-          :class="selectedStatus === '4,5,6' ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
+          @click="selectedStatus = '0,1,2,3'"
+          :class="selectedStatus === '0,1,2,3' ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
           class="px-4 py-1.5 rounded-full font-label-sm text-label-sm transition-colors cursor-pointer"
         >
           Tất cả
         </button>
         <button
-          @click="selectedStatus = 4"
-          :class="selectedStatus === 4 ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
+          @click="selectedStatus = 0"
+          :class="selectedStatus === 0 ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
           class="px-4 py-1.5 rounded-full font-label-sm text-label-sm transition-colors cursor-pointer"
         >
-          Đã hoàn thành
+          Chưa xác nhận
         </button>
         <button
-          @click="selectedStatus = 5"
-          :class="selectedStatus === 5 ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
+          @click="selectedStatus = 1"
+          :class="selectedStatus === 1 ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
           class="px-4 py-1.5 rounded-full font-label-sm text-label-sm transition-colors cursor-pointer"
         >
-          Đã hủy
+          Đã xác nhận
         </button>
         <button
-          @click="selectedStatus = 6"
-          :class="selectedStatus === 6 ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
+          @click="selectedStatus = 2"
+          :class="selectedStatus === 2 ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
           class="px-4 py-1.5 rounded-full font-label-sm text-label-sm transition-colors cursor-pointer"
         >
-          Giao không thành công
+          Chờ giao
+        </button>
+        <button
+          @click="selectedStatus = 3"
+          :class="selectedStatus === 3 ? 'bg-[#EF972D] text-white border-transparent' : 'bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container'"
+          class="px-4 py-1.5 rounded-full font-label-sm text-label-sm transition-colors cursor-pointer"
+        >
+          Đang giao
         </button>
       </div>
 
       <!-- Loading State -->
       <div v-if="isLoading" class="p-10 flex flex-col items-center justify-center gap-3 bg-white border border-outline-variant rounded-lg">
         <div class="w-8 h-8 border-4 border-[#EF972D] border-t-transparent rounded-full animate-spin"></div>
-        <span class="text-sm font-semibold text-gray-500">Đang tải danh sách hóa đơn...</span>
+        <span class="text-sm font-semibold text-gray-500">Đang tải danh sách đơn hàng...</span>
       </div>
 
       <!-- Error State -->
@@ -409,7 +416,7 @@ onMounted(() => {
       <!-- Empty State -->
       <div v-else-if="invoices.length === 0" class="p-10 text-center bg-white border border-outline-variant rounded-lg">
         <span class="material-symbols-outlined text-gray-400 text-5xl">receipt_long</span>
-        <p class="text-sm text-gray-500 font-medium mt-2">Không tìm thấy hóa đơn nào phù hợp.</p>
+        <p class="text-sm text-gray-500 font-medium mt-2">Không tìm thấy đơn hàng nào phù hợp.</p>
       </div>
 
       <!-- Table Section -->
@@ -418,7 +425,7 @@ onMounted(() => {
           <thead class="bg-surface-container-low border-b border-outline-variant">
             <tr>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap text-center w-16">STT</th>
-              <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Mã hóa đơn</th>
+              <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Mã đơn hàng</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Nhân viên tạo</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Khách hàng</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Ngày tạo</th>
@@ -501,7 +508,7 @@ onMounted(() => {
       <!-- Pagination and Counters -->
       <div v-if="totalPages > 1 && invoices.length > 0" class="flex justify-between items-center mt-2 flex-col sm:flex-row gap-4">
         <span class="font-body-md text-body-md text-on-surface-variant">
-          Hiển thị {{ currentPage * pageSize + 1 }} đến {{ Math.min((currentPage + 1) * pageSize, totalElements) }} của {{ totalElements }} hóa đơn
+          Hiển thị {{ currentPage * pageSize + 1 }} đến {{ Math.min((currentPage + 1) * pageSize, totalElements) }} của {{ totalElements }} đơn hàng
         </span>
 
         <!-- Pagination Controls -->
@@ -537,7 +544,7 @@ onMounted(() => {
       
       <!-- Single display count if only 1 page -->
       <div v-else-if="invoices.length > 0" class="flex justify-start">
-        <span class="font-body-md text-body-md text-on-surface-variant">Hiển thị {{ totalElements }} hóa đơn</span>
+        <span class="font-body-md text-body-md text-on-surface-variant">Hiển thị {{ totalElements }} đơn hàng</span>
       </div>
     </div>
   </div>
@@ -563,7 +570,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Custom Date input styles if needed */
 input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }

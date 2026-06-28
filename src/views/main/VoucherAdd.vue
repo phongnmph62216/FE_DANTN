@@ -10,7 +10,7 @@ const isEdit = ref(false)
 const voucherId = ref(null)
 
 // Form states
-const maPhieu = ref('PGG' + Math.floor(100000 + Math.random() * 900000))
+const maPhieu = ref('')
 const tenPhieu = ref('')
 const kieuApDung = ref(1) // 0: Toàn cửa hàng, 1: Cá nhân
 const loaiGiam = ref(0) // 0: Giảm %, 1: Giảm tiền mặt
@@ -318,6 +318,31 @@ onMounted(async () => {
     isEdit.value = true
     voucherId.value = route.params.id
     await fetchVoucherDetail(route.params.id)
+  } else {
+    isEdit.value = false
+    try {
+      const res = await api.get('/api/v1/phieu-giam-gia', { params: { page: 0, size: 1000 } })
+      const list = res.data?.content || res.data || []
+      
+      let maxNum = 0
+      list.forEach(item => {
+        if (item.maPhieuGiamGia && item.maPhieuGiamGia.startsWith('PGG')) {
+          const numPart = item.maPhieuGiamGia.replace('PGG', '')
+          const match = numPart.match(/^\d+/)
+          if (match) {
+            const num = parseInt(match[0], 10)
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num
+            }
+          }
+        }
+      })
+      const nextNum = maxNum + 1
+      maPhieu.value = `PGG${String(nextNum).padStart(3, '0')}`
+    } catch (err) {
+      console.warn('API voucher code generation failed, using fallback:', err.message)
+      maPhieu.value = 'PGG' + Math.floor(100000 + Math.random() * 900000)
+    }
   }
   fetchCustomers(0)
 })

@@ -75,6 +75,7 @@ const getStatusText = (status) => {
     case 3: return 'Đang giao'
     case 4: return 'Đã hoàn thành'
     case 5: return 'Đã hủy'
+    case 6: return 'Giao hàng không thành công'
     default: return 'Không xác định'
   }
 }
@@ -198,15 +199,18 @@ const getStepLog = (stepStatus) => {
 
 const isStepCompleted = (stepStatus) => {
   const currentStatus = getStatus.value
-  if (currentStatus === 5) {
-    // If canceled, only show steps completed before cancellation
-    const cancelLog = historyLogs.value.find(l => parseInt(l.trangThai !== undefined ? l.trangThai : l.trangThaiMoi, 10) === 5)
-    if (cancelLog) {
+  if (currentStatus === 5 || currentStatus === 6) {
+    // If canceled or failed, only show steps completed before terminal state
+    const termLog = historyLogs.value.find(l => {
+      const code = parseInt(l.trangThai !== undefined ? l.trangThai : l.trangThaiMoi, 10)
+      return code === 5 || code === 6
+    })
+    if (termLog) {
       const stepLog = getStepLog(stepStatus)
       if (stepLog) {
-        const cancelTime = cancelLog.thoiGian || cancelLog.ngayTao || cancelLog.createdAt
+        const termTime = termLog.thoiGian || termLog.ngayTao || termLog.createdAt
         const stepTime = stepLog.ngayTao || stepLog.createdAt
-        return new Date(stepTime) <= new Date(cancelTime)
+        return new Date(stepTime) <= new Date(termTime)
       }
     }
     return false
@@ -246,7 +250,7 @@ const stepperSteps = computed(() => {
 // Calculate active progress line width in percentage
 const activeLineWidthPercent = computed(() => {
   const current = getStatus.value
-  if (current === 5) return '100%' // Show full path (will be colored red/gray)
+  if (current === 5 || current === 6) return '100%' // Show full path (will be colored red/gray)
   
   if (getOrderType.value === 0) {
     // 2 nodes -> 0% (at node 0) or 100% (at node 4)
@@ -303,8 +307,8 @@ const availableTransitionOptions = computed(() => {
   const type = getOrderType.value
   const options = []
 
-  // If already Completed (4) or Canceled (5), no transitions are possible
-  if (current === 4 || current === 5) {
+  // If already Completed (4), Canceled (5), or Failed (6), no transitions are possible
+  if (current === 4 || current === 5 || current === 6) {
     return options
   }
 
@@ -329,6 +333,7 @@ const availableTransitionOptions = computed(() => {
     } else if (current === 3) {
       options.push({ value: 4, label: 'Đã hoàn thành' })
       options.push({ value: 5, label: 'Đã hủy' })
+      options.push({ value: 6, label: 'Giao hàng không thành công' })
     }
   }
 
@@ -523,6 +528,9 @@ onMounted(() => {
           <span v-if="getStatus === 5" class="ml-3 bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
             Đã hủy đơn hàng
           </span>
+          <span v-else-if="getStatus === 6" class="ml-3 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
+            Giao hàng không thành công
+          </span>
         </div>
 
         <!-- Horizontal Stepper component -->
@@ -531,7 +539,7 @@ onMounted(() => {
           <div class="absolute top-10 left-12 right-12 h-[2px] bg-outline-variant z-0"></div>
           <!-- Active Line Progress -->
           <div
-            :class="getStatus === 5 ? 'bg-red-500' : 'bg-primary-container'"
+            :class="getStatus === 5 || getStatus === 6 ? 'bg-red-500' : 'bg-primary-container'"
             class="absolute top-10 left-12 h-[2px] z-0 transition-all duration-300"
             :style="{ width: activeLineWidthPercent }"
           ></div>
@@ -546,9 +554,9 @@ onMounted(() => {
             <div
               :class="[
                 isStepCompleted(step.status)
-                  ? (getStatus === 5 ? 'bg-red-500 text-white border-red-500' : 'bg-primary-container text-white border-primary-container')
+                  ? (getStatus === 5 || getStatus === 6 ? 'bg-red-500 text-white border-red-500' : 'bg-primary-container text-white border-primary-container')
                   : 'bg-surface-container-lowest text-outline border-2 border-outline',
-                getStatus === step.status && getStatus !== 5 ? 'ring-4 ring-orange-100 scale-105' : ''
+                getStatus === step.status && getStatus !== 5 && getStatus !== 6 ? 'ring-4 ring-orange-100 scale-105' : ''
               ]"
               class="w-14 h-14 rounded-full flex items-center justify-center mb-3 shadow-sm transition-transform"
             >
@@ -563,7 +571,7 @@ onMounted(() => {
             <!-- Step meta info -->
             <div class="text-center">
               <p
-                :class="isStepCompleted(step.status) ? (getStatus === 5 ? 'text-red-500' : 'text-primary-container') : 'text-on-surface-variant'"
+                :class="isStepCompleted(step.status) ? (getStatus === 5 || getStatus === 6 ? 'text-red-500' : 'text-primary-container') : 'text-on-surface-variant'"
                 class="font-label-sm text-label-sm mb-1 font-bold"
               >
                 {{ step.label }}

@@ -101,6 +101,27 @@ const editForm = ref({
   idVaiAo: ''
 })
 
+// Variant management state
+const productVariants = ref([])
+const isLoadingVariants = ref(false)
+const colors = ref([])
+const sizes = ref([])
+
+// Form state for creating a new variant
+const newVariantForm = ref({
+  idMauSac: '',
+  idKichThuoc: '',
+  soLuongTon: 0,
+  giaNhap: 0,
+  giaBan: 0,
+  anh: ''
+})
+const isCreatingVariant = ref(false)
+
+const inlineFileInputRef = ref(null)
+const activeInlineVariant = ref(null)
+const variantFileInputRef = ref(null)
+
 // Pagination & Loading States
 const isLoading = ref(false)
 const fetchError = ref(false)
@@ -214,6 +235,8 @@ const loadFilters = async () => {
       collars.value = (data.coAoList || []).map(item => ({ id: item.id, name: sanitizeVietnamese(item.ten || '') }))
       sleeves.value = (data.tayAoList || []).map(item => ({ id: item.id, name: sanitizeVietnamese(item.ten || '') }))
       shoulders.value = (data.vaiAoList || []).map(item => ({ id: item.id, name: sanitizeVietnamese(item.ten || '') }))
+      colors.value = (data.mauSacList || []).map(item => ({ id: item.id, name: sanitizeVietnamese(item.ten || '') }))
+      sizes.value = (data.kichThuocList || []).map(item => ({ id: item.id, name: sanitizeVietnamese(item.ten || '') }))
     }
   } catch (err) {
     console.warn('Failed to load filter option attributes list:', err)
@@ -298,6 +321,7 @@ const openEditModal = async (product) => {
         idVaiAo: data.idVaiAo || ''
       }
       showEditModal.value = true
+      await fetchProductVariants(data.id)
     }
   } catch (err) {
     console.error('Failed to fetch product details:', err)
@@ -671,6 +695,173 @@ const handleScanQrSuccess = async (scannedCode) => {
     showToast('Mã QR không hợp lệ hoặc sản phẩm không tồn tại trong hệ thống', 'error')
   } finally {
     isLoading.value = false
+  }
+}
+
+const triggerInlineImageUpload = (variant) => {
+  activeInlineVariant.value = variant
+  inlineFileInputRef.value?.click()
+}
+
+const handleInlineImageUpload = async (e) => {
+  const files = Array.from(e.target.files || [])
+  if (files.length === 0 || !activeInlineVariant.value) return
+
+  try {
+    const file = files[0]
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await api.post('/api/v1/images/upload', formData)
+    activeInlineVariant.value.anh = res.data
+    showToast('Tải ảnh biến thể lên thành công!', 'success')
+  } catch (err) {
+    console.error('Failed to upload inline image:', err)
+    showToast(`Tải ảnh lên thất bại: ${err.message || 'Không thể kết nối máy chủ'}`, 'error')
+  } finally {
+    activeInlineVariant.value = null
+  }
+}
+
+const triggerVariantFileInput = () => {
+  variantFileInputRef.value?.click()
+}
+
+const handleVariantImageUpload = async (e) => {
+  const files = Array.from(e.target.files || [])
+  if (files.length === 0) return
+
+  try {
+    const file = files[0]
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await api.post('/api/v1/images/upload', formData)
+    newVariantForm.value.anh = res.data
+    showToast('Tải ảnh biến thể mới lên thành công!', 'success')
+  } catch (err) {
+    console.error('Failed to upload variant image:', err)
+    showToast(`Tải ảnh lên thất bại: ${err.message || 'Không thể kết nối máy chủ'}`, 'error')
+  }
+}
+
+const fetchProductVariants = async (productId) => {
+  try {
+    isLoadingVariants.value = true
+    const res = await api.get('/api/v1/chi-tiet-san-pham', {
+      params: {
+        idSanPham: productId,
+        size: 1000
+      }
+    })
+    if (res.data && res.data.content) {
+      productVariants.value = res.data.content.map(v => ({
+        id: v.id,
+        anh: v.anh || '',
+        tenKichCo: sanitizeVietnamese(v.tenKichThuoc || ''),
+        tenMauSac: sanitizeVietnamese(v.tenMauSac || ''),
+        soLuongTon: v.soLuongTon ?? 0,
+        giaNhap: v.giaNhap ?? 0,
+        giaBan: v.giaBan ?? 0,
+        trangThai: v.trangThai ?? 1
+      }))
+    } else {
+      productVariants.value = []
+    }
+  } catch (err) {
+    console.error('Failed to load variants:', err)
+    showToast('Không thể lấy danh sách biến thể của sản phẩm này!', 'error')
+  } finally {
+    isLoadingVariants.value = false
+  }
+}
+
+const saveVariantInline = async (variant) => {
+  if (variant.soLuongTon === undefined || variant.soLuongTon === null || variant.soLuongTon < 0) {
+    showToast('Tồn kho phải từ 0 trở lên.', 'error')
+    return
+  }
+  if (variant.giaNhap === undefined || variant.giaNhap === null || variant.giaNhap < 0) {
+    showToast('Giá nhập không được âm.', 'error')
+    return
+  }
+  if (variant.giaBan === undefined || variant.giaBan === null || variant.giaBan < 0) {
+    showToast('Giá bán không được âm.', 'error')
+    return
+  }
+
+  try {
+    const payload = {
+      giaNhap: Number(variant.giaNhap),
+      giaBan: Number(variant.giaBan),
+      soLuongTon: Number(variant.soLuongTon),
+      anh: variant.anh,
+      trangThai: Number(variant.trangThai)
+    }
+
+    await api.put(`/api/v1/chi-tiet-san-pham/${variant.id}`, payload)
+    showToast(`Cập nhật biến thể (${variant.tenMauSac} - ${variant.tenKichCo}) thành công!`, 'success')
+    fetchProducts(currentPage.value)
+  } catch (err) {
+    console.error('Failed to update variant:', err)
+    showToast('Cập nhật biến thể thất bại. Vui lòng thử lại!', 'error')
+  }
+}
+
+const createNewVariant = async () => {
+  if (!newVariantForm.value.idMauSac) {
+    showToast('Vui lòng chọn màu sắc cho biến thể mới.', 'error')
+    return
+  }
+  if (!newVariantForm.value.idKichThuoc) {
+    showToast('Vui lòng chọn kích thước cho biến thể mới.', 'error')
+    return
+  }
+  if (newVariantForm.value.soLuongTon === undefined || newVariantForm.value.soLuongTon === null || newVariantForm.value.soLuongTon < 0) {
+    showToast('Số lượng tồn kho phải từ 0 trở lên.', 'error')
+    return
+  }
+  if (newVariantForm.value.giaNhap === undefined || newVariantForm.value.giaNhap === null || newVariantForm.value.giaNhap < 0) {
+    showToast('Giá nhập không được âm.', 'error')
+    return
+  }
+  if (newVariantForm.value.giaBan === undefined || newVariantForm.value.giaBan === null || newVariantForm.value.giaBan < 0) {
+    showToast('Giá bán không được âm.', 'error')
+    return
+  }
+  try {
+    isCreatingVariant.value = true
+    const payload = {
+      idSanPham: editForm.value.id,
+      idMauSac: Number(newVariantForm.value.idMauSac),
+      idKichThuoc: Number(newVariantForm.value.idKichThuoc),
+      soLuongTon: Number(newVariantForm.value.soLuongTon),
+      giaNhap: Number(newVariantForm.value.giaNhap),
+      giaBan: Number(newVariantForm.value.giaBan),
+      anh: newVariantForm.value.anh
+    }
+
+    await api.post('/api/v1/chi-tiet-san-pham', payload)
+    showToast('Thêm biến thể mới thành công!', 'success')
+    newVariantForm.value = {
+      idMauSac: '',
+      idKichThuoc: '',
+      soLuongTon: 0,
+      giaNhap: 0,
+      giaBan: 0,
+      anh: ''
+    }
+    await fetchProductVariants(editForm.value.id)
+    fetchProducts(currentPage.value)
+  } catch (err) {
+    console.error('Failed to create variant:', err)
+    let errorMsg = 'Thêm biến thể thất bại.'
+    if (err.response && err.response.data && err.response.data.message) {
+      errorMsg += ` Chi tiết: ${err.response.data.message}`
+    }
+    showToast(errorMsg, 'error')
+  } finally {
+    isCreatingVariant.value = false
   }
 }
 
@@ -1211,6 +1402,196 @@ onMounted(() => {
             </div>
           </div>
         </div>
+
+        <!-- Biến thể sản phẩm (Bổ sung mới) -->
+        <div class="border-t border-gray-100 pt-6 mt-6">
+          <h3 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[#ef972d]">widgets</span>
+            Danh sách biến thể của sản phẩm
+          </h3>
+
+          <div v-if="isLoadingVariants" class="py-6 text-center text-gray-500 text-xs">
+            <span class="animate-spin material-symbols-outlined text-xl text-[#EF972D] align-middle mr-1.5">progress_activity</span>
+            Đang tải danh sách biến thể...
+          </div>
+          <div v-else-if="productVariants.length === 0" class="py-4 text-center text-gray-500 text-xs bg-gray-50 rounded-lg">
+            Sản phẩm chưa có biến thể nào.
+          </div>
+          <div v-else class="overflow-x-auto border border-gray-100 rounded-xl mb-6">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-gray-50 border-b border-gray-100">
+                <tr class="text-gray-500 font-semibold">
+                  <th class="px-4 py-2.5 w-14 text-center">Ảnh</th>
+                  <th class="px-4 py-2.5">Màu sắc</th>
+                  <th class="px-4 py-2.5">Kích thước</th>
+                  <th class="px-4 py-2.5 w-24">Tồn kho</th>
+                  <th class="px-4 py-2.5 w-28">Giá nhập (₫)</th>
+                  <th class="px-4 py-2.5 w-28">Giá bán (₫)</th>
+                  <th class="px-4 py-2.5 w-28">Trạng thái</th>
+                  <th class="px-4 py-2.5 w-16 text-center">Hành động</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr v-for="vItem in productVariants" :key="vItem.id" class="hover:bg-gray-50/50">
+                  <td class="px-4 py-2 text-center">
+                    <div class="relative w-8 h-8 mx-auto group cursor-pointer border rounded bg-gray-50 flex items-center justify-center overflow-hidden" @click="triggerInlineImageUpload(vItem)">
+                      <img v-if="vItem.anh" :src="formatImage(vItem.anh)" class="w-full h-full object-cover" />
+                      <span v-else class="material-symbols-outlined text-gray-400 text-base">image</span>
+                      <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded">
+                        <span class="material-symbols-outlined text-white text-[12px]">upload</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-2 font-medium text-gray-900">{{ vItem.tenMauSac }}</td>
+                  <td class="px-4 py-2 font-medium text-gray-900">{{ vItem.tenKichCo }}</td>
+                  <td class="px-4 py-2">
+                    <input
+                      type="number"
+                      v-model.number="vItem.soLuongTon"
+                      min="0"
+                      class="w-full px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-[#ef972d]/30 focus:border-[#ef972d] outline-none text-xs"
+                    />
+                  </td>
+                  <td class="px-4 py-2">
+                    <input
+                      type="number"
+                      v-model.number="vItem.giaNhap"
+                      min="0"
+                      class="w-full px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-[#ef972d]/30 focus:border-[#ef972d] outline-none text-xs font-semibold text-gray-700"
+                    />
+                  </td>
+                  <td class="px-4 py-2">
+                    <input
+                      type="number"
+                      v-model.number="vItem.giaBan"
+                      min="0"
+                      class="w-full px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-[#ef972d]/30 focus:border-[#ef972d] outline-none text-xs font-bold text-[#ef972d]"
+                    />
+                  </td>
+                  <td class="px-4 py-2">
+                    <select
+                      v-model.number="vItem.trangThai"
+                      class="w-full px-1.5 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-[#ef972d]/30 focus:border-[#ef972d] outline-none text-xs bg-white cursor-pointer"
+                    >
+                      <option :value="1">Đang bán</option>
+                      <option :value="0">Ngừng bán</option>
+                    </select>
+                  </td>
+                  <td class="px-4 py-2 text-center">
+                    <button
+                      @click="saveVariantInline(vItem)"
+                      class="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors cursor-pointer"
+                      title="Lưu biến thể này"
+                    >
+                      <span class="material-symbols-outlined text-lg">check_circle</span>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Form thêm biến thể mới (Bổ sung mới) -->
+          <div class="bg-gray-50/50 border border-dashed border-gray-200 rounded-xl p-4 space-y-4">
+            <h4 class="text-xs font-bold text-gray-700 flex items-center gap-1">
+              <span class="material-symbols-outlined text-[#ef972d] text-base">add_box</span>
+              Thêm biến thể mới cho sản phẩm này
+            </h4>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 mb-1">Màu sắc *</label>
+                <select
+                  v-model="newVariantForm.idMauSac"
+                  class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-xs bg-white cursor-pointer"
+                >
+                  <option value="">Chọn màu</option>
+                  <option v-for="item in colors" :key="item.id" :value="item.id">{{ item.name }}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 mb-1">Kích thước *</label>
+                <select
+                  v-model="newVariantForm.idKichThuoc"
+                  class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-xs bg-white cursor-pointer"
+                >
+                  <option value="">Chọn kích cỡ</option>
+                  <option v-for="item in sizes" :key="item.id" :value="item.id">{{ item.name }}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 mb-1">Tồn kho *</label>
+                <input
+                  type="number"
+                  v-model.number="newVariantForm.soLuongTon"
+                  min="0"
+                  class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-xs"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 mb-1">Giá nhập * (₫)</label>
+                <input
+                  type="number"
+                  v-model.number="newVariantForm.giaNhap"
+                  min="0"
+                  class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-xs"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 mb-1">Giá bán * (₫)</label>
+                <input
+                  type="number"
+                  v-model.number="newVariantForm.giaBan"
+                  min="0"
+                  class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-xs font-bold text-[#ef972d]"
+                />
+              </div>
+
+              <div class="flex gap-2">
+                <!-- Variant image upload button -->
+                <div class="flex-1">
+                  <label class="block text-[10px] font-bold text-gray-500 mb-1">Ảnh biến thể *</label>
+                  <button
+                    type="button"
+                    @click="triggerVariantFileInput"
+                    class="w-full px-2 py-2 border border-[#ef972d]/30 text-[#ef972d] hover:bg-[#ef972d]/5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span class="material-symbols-outlined text-sm">upload</span>
+                    {{ newVariantForm.anh ? 'Đã có ảnh' : 'Tải ảnh' }}
+                  </button>
+                  <!-- Hidden file input for new variant image -->
+                  <input type="file" ref="variantFileInputRef" class="hidden" @change="handleVariantImageUpload" accept="image/*" />
+                </div>
+
+                <button
+                  type="button"
+                  @click="createNewVariant"
+                  :disabled="isCreatingVariant"
+                  class="px-4 py-2 bg-[#EF972D] hover:bg-[#EF972D]/90 disabled:opacity-50 text-white rounded-lg font-semibold text-xs transition-all cursor-pointer shadow-sm flex items-center justify-center"
+                >
+                  <span v-if="isCreatingVariant" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span v-else>Thêm</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Preview of uploaded variant image -->
+            <div v-if="newVariantForm.anh" class="flex items-center gap-2 bg-white p-2 rounded-lg border w-fit">
+              <img :src="formatImage(newVariantForm.anh)" class="w-10 h-10 rounded object-cover" />
+              <span class="text-[10px] text-gray-500">Xem trước ảnh biến thể</span>
+              <button @click="newVariantForm.anh = ''" class="text-red-500 hover:text-red-600 cursor-pointer">
+                <span class="material-symbols-outlined text-sm">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hidden input for inline image upload -->
+        <input type="file" ref="inlineFileInputRef" class="hidden" @change="handleInlineImageUpload" accept="image/*" />
       </div>
 
       <!-- Modal Footer -->
