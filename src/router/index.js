@@ -9,6 +9,7 @@ import VnpayReturnView from '../views/main/VnpayReturnView.vue'
 import OrderLookupView from '../views/main/OrderLookupView.vue'
 import MyOrdersView from '../views/main/MyOrdersView.vue'
 import HomeView from '../views/main/HomeView.vue'
+import ThongKeView from '../views/main/ThongKeView.vue'
 import ProductList from '../views/main/ProductList.vue'
 import ProductVariantList from '../views/main/ProductVariantList.vue'
 import AttributeList from '../views/main/AttributeList.vue'
@@ -92,6 +93,12 @@ const router = createRouter({
       path: '/admin',
       name: 'admin-home',
       component: HomeView,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/admin/thong-ke',
+      name: 'admin-thong-ke',
+      component: ThongKeView,
       meta: { layout: 'DashboardLayout' },
     },
     {

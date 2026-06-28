@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@antv/g2plot": "^2.4.35",
     "@tailwindcss/vite": "^4.3.0",
     "axios": "^1.16.1",
     "html5-qrcode": "^2.3.8",
