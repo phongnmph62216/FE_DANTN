@@ -72,16 +72,88 @@ const formatDate = (dateStr) => {
   })
 }
 
+const showOpenShiftModal = ref(false)
+const shiftStatus = ref(null)
+const currentOpenTime = ref('')
+const startingCashInput = ref(0)
+const isOpeningShift = ref(false)
+
+const formatCurrency = (val) => {
+  if (val === null || val === undefined) return '0 VNĐ'
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val).replace('₫', 'VNĐ')
+}
+
+const updateClock = () => {
+  const now = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  currentOpenTime.value = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`
+}
+
+let clockInterval = null
+const startClock = () => {
+  updateClock()
+  if (!clockInterval) {
+    clockInterval = setInterval(updateClock, 1000)
+  }
+}
+const stopClock = () => {
+  if (clockInterval) {
+    clearInterval(clockInterval)
+    clockInterval = null
+  }
+}
+
+const checkShiftStatus = async () => {
+  if (!authStore.isLoggedIn || !authStore.isAdminOrStaff) return
+
+  try {
+    const res = await api.get('/api/v1/giao-ca/current-status')
+    const statusData = res.data
+    shiftStatus.value = statusData
+    if (statusData && statusData.hasScheduleToday && statusData.status === 'NOT_OPENED') {
+      showOpenShiftModal.value = true
+      startingCashInput.value = statusData.previousShiftCash || 0
+      startClock()
+    } else {
+      showOpenShiftModal.value = false
+      stopClock()
+    }
+  } catch (error) {
+    console.error('Error checking shift status:', error)
+  }
+}
+
+const handleOpenShift = async () => {
+  if (!shiftStatus.value || !shiftStatus.value.scheduleId) return
+  isOpeningShift.value = true
+  try {
+    await api.post('/api/v1/giao-ca/mo-ca', {
+      idLichLamViec: shiftStatus.value.scheduleId,
+      tienMatDauCa: startingCashInput.value
+    })
+    showOpenShiftModal.value = false
+    stopClock()
+    alert('Mở ca làm việc thành công!')
+  } catch (error) {
+    console.error('Error opening shift:', error)
+    alert(error.response?.data?.message || 'Có lỗi xảy ra khi mở ca làm việc.')
+  } finally {
+    isOpeningShift.value = false
+  }
+}
+
 let pollInterval = null
 onMounted(() => {
   fetchNotifications()
   pollInterval = setInterval(fetchNotifications, 10000)
   document.addEventListener('click', closeNotificationsPanel)
+  checkShiftStatus()
 })
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
   document.removeEventListener('click', closeNotificationsPanel)
+  stopClock()
 })
 
 // State to expand/collapse sidebar
@@ -149,7 +221,7 @@ const isActiveRoute = (path) => {
         </li>
 
         <!-- Thống kê -->
-        <li>
+        <li v-if="authStore.isManager">
           <RouterLink
             to="/admin/thong-ke"
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
@@ -211,7 +283,7 @@ const isActiveRoute = (path) => {
         </li>
 
         <!-- Quản lý sản phẩm (Collapsible) -->
-        <li>
+        <li v-if="authStore.isManager">
           <button
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
             @click="toggleMenu('products')"
@@ -246,7 +318,7 @@ const isActiveRoute = (path) => {
         </li>
 
         <!-- Danh sách thuộc tính (Collapsible) -->
-        <li>
+        <li v-if="authStore.isManager">
           <button
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
             @click="toggleMenu('attributes')"
@@ -337,7 +409,7 @@ const isActiveRoute = (path) => {
         </li>
 
         <!-- Quản lý giảm giá (Collapsible) -->
-        <li>
+        <li v-if="authStore.isManager">
           <button
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
             @click="toggleMenu('discounts')"
@@ -371,8 +443,8 @@ const isActiveRoute = (path) => {
           </div>
         </li>
 
-        <!-- Quản lý tài khoản (Collapsible) -->
-        <li>
+        <!-- Quản lý tài khoản (Collapsible) - Manager Only -->
+        <li v-if="authStore.isManager">
           <button
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
             @click="toggleMenu('accounts')"
@@ -403,8 +475,21 @@ const isActiveRoute = (path) => {
             >
               Nhân viên
             </RouterLink>
-
           </div>
+        </li>
+
+        <!-- Khách hàng - Employee Only -->
+        <li v-if="authStore.isEmployee">
+          <RouterLink
+            to="/customers"
+            :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
+            class="flex items-center gap-3 py-3 rounded-lg font-bold transition-all shadow-sm"
+            :style="isActiveRoute('/customers') || route.path.startsWith('/customers') ? 'background-image: linear-gradient(to right, #FFB74D, #EF972D); color: #ffffff;' : 'color: rgba(211, 228, 254, 0.8);'"
+            :class-active="isActiveRoute('/customers') || route.path.startsWith('/customers') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
+          >
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">group</span>
+            <span class="font-body-md text-body-md font-semibold whitespace-nowrap" v-show="sidebarExpanded">Khách hàng</span>
+          </RouterLink>
         </li>
 
         <!-- Lịch làm việc (Collapsible) -->
@@ -425,9 +510,49 @@ const isActiveRoute = (path) => {
             >expand_more</span>
           </button>
           <div class="pl-11 pr-4 py-1 flex flex-col gap-1" v-show="menuStates.schedules && sidebarExpanded">
-            <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Lịch làm việc</a>
-            <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Ca làm việc</a>
-            <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Lịch sử hoạt động</a>
+            <!-- Cho nhân viên -->
+            <template v-if="authStore.isEmployee">
+              <RouterLink
+                to="/admin/lich-lam-viec-cua-toi"
+                class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+                :class="isActiveRoute('/admin/lich-lam-viec-cua-toi') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+              >
+                Lịch của tôi
+              </RouterLink>
+              <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Giao ca</a>
+              <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Kế toán</a>
+            </template>
+            <!-- Cho quản lý -->
+            <template v-else>
+              <RouterLink
+                to="/admin/lich-lam-viec-cua-toi"
+                class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+                :class="isActiveRoute('/admin/lich-lam-viec-cua-toi') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+              >
+                Lịch của tôi
+              </RouterLink>
+              <RouterLink
+                to="/admin/lich-lam-viec"
+                class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+                :class="isActiveRoute('/admin/lich-lam-viec') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+              >
+                Lịch làm việc
+              </RouterLink>
+              <RouterLink
+                to="/admin/ca-lam-viec"
+                class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+                :class="isActiveRoute('/admin/ca-lam-viec') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+              >
+                Ca làm việc
+              </RouterLink>
+              <RouterLink
+                to="/admin/lich-su-hoat-dong"
+                class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+                :class="isActiveRoute('/admin/lich-su-hoat-dong') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+              >
+                Lịch sử hoạt động
+              </RouterLink>
+            </template>
           </div>
         </li>
 
@@ -562,6 +687,96 @@ const isActiveRoute = (path) => {
       <main class="flex-1 mt-16 p-container-padding bg-[#F8F9FA] w-full">
         <slot />
       </main>
+    </div>
+
+    <!-- Blocking Open Shift Modal -->
+    <div v-if="showOpenShiftModal && shiftStatus" class="fixed inset-0 bg-[#0D2533]/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-gray-150 overflow-hidden transform transition-all">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-[#A17C58] to-[#8C6239] text-white text-center py-6 px-4">
+          <h3 class="text-xl font-bold uppercase tracking-wider">Mở Ca Làm Việc</h3>
+          <p class="text-xs text-white/80 mt-1 font-medium">Hệ thống quản lý bán hàng ChocoStyle Shop</p>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6 space-y-5">
+          <!-- User info & Live Clock -->
+          <div class="bg-gray-100/80 rounded-full px-4 py-2 text-xs font-semibold text-gray-600 text-center">
+            Nhân viên : <span class="font-bold text-gray-800">{{ shiftStatus.employeeName }}</span> • {{ currentOpenTime }}
+          </div>
+
+          <!-- Assigned Shift -->
+          <div>
+            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Ca làm việc được phân công</label>
+            <div class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700">
+              {{ shiftStatus.shiftName }}
+            </div>
+          </div>
+
+          <!-- Handover Card -->
+          <div class="bg-sky-50 border border-sky-100 rounded-2xl p-4 space-y-2.5">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-sky-800 uppercase tracking-wider">
+              <span class="material-symbols-outlined text-[18px]">swap_horiz</span>
+              Bàn giao từ ca trước:
+            </div>
+            <div class="flex justify-between items-center text-xs text-sky-700 font-medium">
+              <span>Tiền mặt tại két:</span>
+              <span class="font-bold text-sm text-sky-900">{{ formatCurrency(shiftStatus.previousShiftCash) }}</span>
+            </div>
+            <div class="flex justify-between items-center text-xs text-sky-700 font-medium">
+              <span>Số dư chuyển khoản:</span>
+              <span class="font-bold text-sm text-sky-900">{{ formatCurrency(shiftStatus.previousShiftBank) }}</span>
+            </div>
+          </div>
+
+          <!-- Starting Cash Input -->
+          <div>
+            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Xác nhận Tiền mặt đầu ca</label>
+            <div class="relative flex items-center">
+              <input 
+                type="number" 
+                v-model.number="startingCashInput"
+                class="w-full px-4 py-3 bg-white border-2 border-gray-200 focus:border-[#8C6239] rounded-xl outline-none text-sm font-bold text-gray-800 transition-all pr-12"
+                placeholder="0"
+              />
+              <span class="absolute right-4 text-xs font-bold text-gray-400">VND</span>
+            </div>
+          </div>
+
+          <!-- Starting Bank Balance Input (disabled) -->
+          <div>
+            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Xác nhận Tiền tài khoản đầu ca</label>
+            <p class="text-[10px] text-gray-400 mb-1.5 italic">Tiền tài khoản đầu ca (Tự động chuyển từ ca trước)</p>
+            <div class="relative flex items-center">
+              <input 
+                type="text" 
+                disabled
+                :value="startingCashInput > 0 ? 0 : 0" 
+                class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm font-bold text-gray-400 cursor-not-allowed pr-12"
+              />
+              <span class="absolute right-4 text-xs font-bold text-gray-400">VND</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 pb-6 pt-2 flex gap-4">
+          <button 
+            @click="handleLogout"
+            class="flex-1 py-3 border-2 border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl font-bold text-sm transition-all text-center cursor-pointer"
+          >
+            Hủy bỏ
+          </button>
+          <button 
+            @click="handleOpenShift"
+            :disabled="isOpeningShift"
+            class="flex-1 py-3 bg-[#8C6239] hover:bg-[#734D2A] disabled:bg-[#8C6239]/50 text-white rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <span v-if="isOpeningShift" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            Xác nhận mở ca
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

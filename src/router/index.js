@@ -26,6 +26,10 @@ import InvoiceList from '../views/main/InvoiceList.vue'
 import InvoiceDetail from '../views/main/InvoiceDetail.vue'
 import POSManagement from '../views/main/POSManagement.vue'
 import OrderList from '../views/main/OrderList.vue'
+import CaLamViecView from '../views/main/CaLamViecView.vue'
+import LichLamViecView from '../views/main/LichLamViecView.vue'
+import LichSuHoatDongView from '../views/main/LichSuHoatDongView.vue'
+import LichLamViecCuaToiView from '../views/main/LichLamViecCuaToiView.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
@@ -239,6 +243,30 @@ const router = createRouter({
       component: POSManagement,
       meta: { layout: 'DashboardLayout' },
     },
+    {
+      path: '/admin/ca-lam-viec',
+      name: 'admin-ca-lam-viec',
+      component: CaLamViecView,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/admin/lich-lam-viec',
+      name: 'admin-lich-lam-viec',
+      component: LichLamViecView,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/admin/lich-su-hoat-dong',
+      name: 'admin-lich-su-hoat-dong',
+      component: LichSuHoatDongView,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/admin/lich-lam-viec-cua-toi',
+      name: 'admin-lich-lam-viec-cua-toi',
+      component: LichLamViecCuaToiView,
+      meta: { layout: 'DashboardLayout' },
+    },
   ],
 })
 
@@ -265,6 +293,22 @@ router.beforeEach((to, from, next) => {
   if (requiresAdmin) {
     if (!authStore.isLoggedIn || !authStore.isAdminOrStaff) {
       return next({ name: 'auth' })
+    }
+    // Block staff from accessing manager-only routes
+    const managerOnlyRoutes = [
+      '/admin/thong-ke',
+      '/admin/ca-lam-viec',
+      '/admin/lich-lam-viec',
+      '/admin/lich-su-hoat-dong',
+      '/products',
+      '/attributes',
+      '/vouchers',
+      '/discounts',
+      '/employees'
+    ]
+    const requiresManager = managerOnlyRoutes.some(path => to.path === path || to.path.startsWith(path + '/'))
+    if (requiresManager && !authStore.isManager) {
+      return next({ name: 'admin-home' })
     }
   }
 
