@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -154,6 +154,10 @@ onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
   document.removeEventListener('click', closeNotificationsPanel)
   stopClock()
+})
+
+watch(() => route.path, () => {
+  checkShiftStatus()
 })
 
 // State to expand/collapse sidebar
@@ -519,8 +523,20 @@ const isActiveRoute = (path) => {
               >
                 Lịch của tôi
               </RouterLink>
-              <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Giao ca</a>
-              <a class="py-2 text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5 rounded-md px-3 font-body-md text-sm transition-colors block" href="#">Kế toán</a>
+              <RouterLink
+                to="/admin/giao-ca"
+                class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+                :class="isActiveRoute('/admin/giao-ca') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+              >
+                Giao ca
+              </RouterLink>
+              <RouterLink
+                to="/admin/ke-toan"
+                class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+                :class="isActiveRoute('/admin/ke-toan') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+              >
+                Kế toán
+              </RouterLink>
             </template>
             <!-- Cho quản lý -->
             <template v-else>
@@ -693,7 +709,7 @@ const isActiveRoute = (path) => {
     <div v-if="showOpenShiftModal && shiftStatus" class="fixed inset-0 bg-[#0D2533]/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
       <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-gray-150 overflow-hidden transform transition-all">
         <!-- Header -->
-        <div class="bg-gradient-to-r from-[#A17C58] to-[#8C6239] text-white text-center py-6 px-4">
+        <div class="bg-gradient-to-r from-[#F6B25C] to-[#EF972D] text-white text-center py-6 px-4">
           <h3 class="text-xl font-bold uppercase tracking-wider">Mở Ca Làm Việc</h3>
           <p class="text-xs text-white/80 mt-1 font-medium">Hệ thống quản lý bán hàng ChocoStyle Shop</p>
         </div>
@@ -736,7 +752,7 @@ const isActiveRoute = (path) => {
               <input 
                 type="number" 
                 v-model.number="startingCashInput"
-                class="w-full px-4 py-3 bg-white border-2 border-gray-200 focus:border-[#8C6239] rounded-xl outline-none text-sm font-bold text-gray-800 transition-all pr-12"
+                class="w-full px-4 py-3 bg-white border-2 border-gray-200 focus:border-[#EF972D] rounded-xl outline-none text-sm font-bold text-gray-800 transition-all pr-12"
                 placeholder="0"
               />
               <span class="absolute right-4 text-xs font-bold text-gray-400">VND</span>
@@ -770,7 +786,7 @@ const isActiveRoute = (path) => {
           <button 
             @click="handleOpenShift"
             :disabled="isOpeningShift"
-            class="flex-1 py-3 bg-[#8C6239] hover:bg-[#734D2A] disabled:bg-[#8C6239]/50 text-white rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5"
+            class="flex-1 py-3 bg-[#EF972D] hover:bg-[#D87D15] disabled:bg-[#EF972D]/50 text-white rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all text-center cursor-pointer flex items-center justify-center gap-1.5"
           >
             <span v-if="isOpeningShift" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
             Xác nhận mở ca

@@ -2638,7 +2638,7 @@ onUnmounted(async () => {
                   
                   <div class="flex justify-between items-center pt-3 border-t border-gray-200">
                     <span class="text-base font-bold text-gray-800">Tổng số tiền</span>
-                    <span class="text-2xl font-bold text-[#8C2D43]">{{ formatCurrency(currentOrder.tongTienThanhToan) }}</span>
+                    <span class="text-2xl font-bold text-[#ef972d]">{{ formatCurrency(currentOrder.tongTienThanhToan) }}</span>
                   </div>
 
                   <!-- Khách thanh toán row -->
@@ -2647,7 +2647,7 @@ onUnmounted(async () => {
                       <span>Khách thanh toán</span>
                       <button 
                         title="Thanh toán" 
-                        class="p-1 bg-[#8C2D43]/10 hover:bg-[#8C2D43]/20 text-[#8C2D43] rounded transition-colors cursor-pointer flex items-center justify-center"
+                        class="p-1 bg-[#ef972d]/10 hover:bg-[#ef972d]/20 text-[#ef972d] rounded transition-colors cursor-pointer flex items-center justify-center"
                       >
                         <span class="material-symbols-outlined text-sm">payments</span>
                       </button>
@@ -3298,7 +3298,7 @@ onUnmounted(async () => {
           type="button"
           @click="submitFinalCheckout"
           :disabled="isLoading"
-          class="bg-gradient-to-r from-red-800 to-red-950 hover:opacity-95 text-white font-black shadow-md rounded-xl px-5 py-2 text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 min-w-[120px] cursor-pointer"
+          class="bg-[#ef972d] hover:bg-[#ef972d]/90 text-white font-black shadow-md rounded-xl px-5 py-2 text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 min-w-[120px] cursor-pointer"
         >
           <span v-if="isLoading" class="w-4.5 h-4.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
           <span>Xác nhận</span>

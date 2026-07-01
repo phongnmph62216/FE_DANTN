@@ -30,6 +30,8 @@ import CaLamViecView from '../views/main/CaLamViecView.vue'
 import LichLamViecView from '../views/main/LichLamViecView.vue'
 import LichSuHoatDongView from '../views/main/LichSuHoatDongView.vue'
 import LichLamViecCuaToiView from '../views/main/LichLamViecCuaToiView.vue'
+import GiaoCaView from '../views/main/GiaoCaView.vue'
+import KeToanView from '../views/main/KeToanView.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
@@ -265,6 +267,18 @@ const router = createRouter({
       path: '/admin/lich-lam-viec-cua-toi',
       name: 'admin-lich-lam-viec-cua-toi',
       component: LichLamViecCuaToiView,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/admin/giao-ca',
+      name: 'admin-giao-ca',
+      component: GiaoCaView,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/admin/ke-toan',
+      name: 'admin-ke-toan',
+      component: KeToanView,
       meta: { layout: 'DashboardLayout' },
     },
   ],

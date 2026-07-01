@@ -127,7 +127,7 @@ const calendarEvents = computed(() => {
     
     let color = '#7E57C2' // Default purple
     const status = getScheduleStatus(sched.ngayLamViec)
-    if (status === 'active') color = '#8C6239' // brown
+    if (status === 'active') color = '#EF972D' // orange
     else if (status === 'past') color = '#EF9A9A' // soft red
     else if (status === 'upcoming') color = '#42A5F5' // blue
 
@@ -183,7 +183,7 @@ onMounted(() => {
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
     <!-- Screen Header -->
-    <h1 class="font-headline-md text-headline-md text-inverse-surface mb-stack-lg font-bold uppercase text-[#8C6239]">
+    <h1 class="font-headline-md text-headline-md text-inverse-surface mb-stack-lg font-bold uppercase text-[#EF972D]">
       LỊCH LÀM VIỆC CỦA TÔI
     </h1>
 
@@ -196,7 +196,7 @@ onMounted(() => {
           <input 
             v-model="filterStartDate"
             type="date"
-            class="px-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-[#8C6239] focus:border-[#8C6239] font-body-md text-body-md transition-all cursor-pointer"
+            class="px-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-[#EF972D] focus:border-[#EF972D] font-body-md text-body-md transition-all cursor-pointer"
           />
         </div>
 
@@ -206,7 +206,7 @@ onMounted(() => {
           <input 
             v-model="filterEndDate"
             type="date"
-            class="px-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-[#8C6239] focus:border-[#8C6239] font-body-md text-body-md transition-all cursor-pointer"
+            class="px-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-[#EF972D] focus:border-[#EF972D] font-body-md text-body-md transition-all cursor-pointer"
           />
         </div>
 
@@ -216,7 +216,7 @@ onMounted(() => {
           <div class="relative">
             <select 
               v-model="filterStatus"
-              class="appearance-none border border-outline-variant rounded-lg bg-surface-container-lowest py-2 pl-3 pr-10 focus:outline-none focus:ring-1 focus:ring-[#8C6239] focus:border-[#8C6239] font-body-md text-body-md text-on-surface-variant cursor-pointer transition-all w-full"
+              class="appearance-none border border-outline-variant rounded-lg bg-surface-container-lowest py-2 pl-3 pr-10 focus:outline-none focus:ring-1 focus:ring-[#EF972D] focus:border-[#EF972D] font-body-md text-body-md text-on-surface-variant cursor-pointer transition-all w-full"
             >
               <option value="all">Tất cả</option>
               <option value="active">Đang làm</option>
@@ -233,9 +233,9 @@ onMounted(() => {
         <!-- Export Excel -->
         <button 
           @click="exportExcel"
-          class="px-4 py-2 border border-outline-variant text-on-surface-variant rounded-lg font-label-sm text-label-sm hover:bg-surface-container-low transition-all flex items-center gap-1.5 cursor-pointer hover:border-[#8C6239]"
+          class="px-4 py-2 border border-outline-variant text-on-surface-variant rounded-lg font-label-sm text-label-sm hover:bg-surface-container-low transition-all flex items-center gap-1.5 cursor-pointer hover:border-[#EF972D]"
         >
-          <span class="material-symbols-outlined text-[16px] text-[#8C6239]">download</span>
+          <span class="material-symbols-outlined text-[16px] text-[#EF972D]">download</span>
           Xuất Excel
         </button>
 
@@ -254,7 +254,7 @@ onMounted(() => {
     <div class="flex items-center gap-2 bg-gray-100 rounded-xl p-1 w-fit border border-gray-200">
       <button 
         @click="viewMode = 'table'"
-        :class="viewMode === 'table' ? 'bg-[#8C6239] text-white shadow-md' : 'text-gray-600 hover:bg-gray-200/50'"
+        :class="viewMode === 'table' ? 'bg-[#EF972D] text-white shadow-md' : 'text-gray-600 hover:bg-gray-200/50'"
         class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
       >
         <span class="material-symbols-outlined text-[16px]">grid_on</span>
@@ -262,7 +262,7 @@ onMounted(() => {
       </button>
       <button 
         @click="viewMode = 'calendar'"
-        :class="viewMode === 'calendar' ? 'bg-[#8C6239] text-white shadow-md' : 'text-gray-600 hover:bg-gray-200/50'"
+        :class="viewMode === 'calendar' ? 'bg-[#EF972D] text-white shadow-md' : 'text-gray-600 hover:bg-gray-200/50'"
         class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
       >
         <span class="material-symbols-outlined text-[16px]">calendar_today</span>
@@ -273,7 +273,7 @@ onMounted(() => {
     <!-- Data Display Section -->
     <section class="bg-surface-container-lowest rounded-lg shadow-sm border border-outline-variant/30 overflow-hidden flex flex-col min-h-[400px]">
       <div v-if="isLoading" class="p-12 flex flex-col items-center justify-center gap-3 flex-1">
-        <div class="w-8 h-8 border-4 border-[#8C6239] border-t-transparent rounded-full animate-spin"></div>
+        <div class="w-8 h-8 border-4 border-[#EF972D] border-t-transparent rounded-full animate-spin"></div>
         <span class="text-sm font-semibold text-on-surface-variant">Đang tải lịch làm việc...</span>
       </div>
 
@@ -308,7 +308,7 @@ onMounted(() => {
                 {{ formatDateVietnamese(item.ngayLamViec) }}
               </td>
               <td class="py-4 px-6">
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-[#8C6239]/10 text-[#8C6239]">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-[#EF972D]/10 text-[#EF972D]">
                   {{ getShift(item.idCaLamViec)?.ten || 'Ca làm việc' }}
                 </span>
               </td>
@@ -321,7 +321,7 @@ onMounted(() => {
               <td class="py-4 px-6 text-center">
                 <span 
                   v-if="getScheduleStatus(item.ngayLamViec) === 'active'"
-                  class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-[#8C6239] text-white shadow-sm"
+                  class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-[#EF972D] text-white shadow-sm"
                 >
                   Đang làm
                 </span>
@@ -406,7 +406,7 @@ onMounted(() => {
   padding: 12px 0;
   font-size: 13px;
   font-weight: 700;
-  color: #8C6239;
+  color: #EF972D;
 }
 .fullcalendar-theme-wrapper .fc-daygrid-day-number {
   font-size: 13px;

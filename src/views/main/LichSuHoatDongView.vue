@@ -1,15 +1,21 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import api from '@/services/api'
 
 // States
 const activityLogs = ref([])
 const loading = ref(false)
+const isAuditing = ref(false)
 
 // Filter states
 const searchKeyword = ref('')
 const fromDate = ref('')
 const toDate = ref('')
+const filterStatus = ref('all') // 'all', 'pending', 'approved', 'discrepancy'
+
+// Audit Form States
+const auditAction = ref('TRU_LUONG') // 'TRU_LUONG', 'CHI_PHI_CUA_HANG', 'KHONG_XU_LY'
+const auditNotes = ref('')
 
 const fetchActivityLogs = async () => {
   loading.value = true
@@ -29,11 +35,52 @@ const fetchActivityLogs = async () => {
   }
 }
 
+// Client-side filtering computed property
+const filteredLogs = computed(() => {
+  let list = activityLogs.value
+  if (filterStatus.value === 'pending') {
+    list = list.filter(log => log.trangThai === 1 && !log.trangThaiDoiSoat) // Closed but not audited
+  } else if (filterStatus.value === 'approved') {
+    list = list.filter(log => log.trangThaiDoiSoat === 1) // Approved
+  } else if (filterStatus.value === 'discrepancy') {
+    list = list.filter(log => log.tienChenhLech !== 0) // Discrepancies
+  }
+  return list
+})
+
 const handleResetFilters = () => {
   searchKeyword.value = ''
   fromDate.value = ''
   toDate.value = ''
+  filterStatus.value = 'all'
   fetchActivityLogs()
+}
+
+const handleApproveAudit = async (log) => {
+  if (!log) return
+  isAuditing.value = true
+  try {
+    const payload = {
+      trangThaiDoiSoat: 1, // 1: Approved / Audited
+      phuongAnXuLy: log.tienChenhLech !== 0 ? auditAction.value : 'KHONG_XU_LY',
+      ghiChuDoiSoat: auditNotes.value
+    }
+    
+    await api.put(`/api/v1/giao-ca/doi-soat/${log.id}`, payload)
+    alert('Đối soát và duyệt ca trực thành công!')
+    
+    // Reset audit inputs
+    auditNotes.value = ''
+    
+    // Refresh list and close modal
+    await fetchActivityLogs()
+    closeDetailsModal()
+  } catch (error) {
+    console.error('Error auditing shift:', error)
+    alert(error.response?.data?.message || 'Có lỗi xảy ra khi đối soát ca trực.')
+  } finally {
+    isAuditing.value = false
+  }
 }
 
 onMounted(() => {
@@ -46,6 +93,14 @@ const selectedLog = ref(null)
 
 const openDetailsModal = (log) => {
   selectedLog.value = log
+  // Pre-fill audit notes/action if already audited
+  if (log.trangThaiDoiSoat) {
+    auditAction.value = log.phuongAnXuLy || 'KHONG_XU_LY'
+    auditNotes.value = log.ghiChuDoiSoat || ''
+  } else {
+    auditAction.value = log.tienChenhLech !== 0 ? 'TRU_LUONG' : 'KHONG_XU_LY'
+    auditNotes.value = ''
+  }
   showDetailsModal.value = true
 }
 
@@ -89,7 +144,7 @@ const formatDateTime = (dateTimeStr) => {
 
     <!-- Filters Area -->
     <div class="bg-white rounded-2xl shadow-xl border border-gray-150 p-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
         <!-- Search Keyword -->
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Tìm kiếm</label>
@@ -127,6 +182,23 @@ const formatDateTime = (dateTimeStr) => {
           />
         </div>
 
+        <!-- Status Filter -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Trạng thái đối soát</label>
+          <div class="relative">
+            <select 
+              v-model="filterStatus"
+              class="w-full appearance-none border border-gray-200 bg-gray-50 hover:bg-gray-100/60 focus:bg-white focus:border-[#EF972D] focus:ring-1 focus:ring-[#EF972D] py-2.5 pl-3 pr-10 rounded-xl outline-none text-sm transition-all cursor-pointer"
+            >
+              <option value="all">Tất cả</option>
+              <option value="pending">Chờ đối soát</option>
+              <option value="approved">Đã đối soát</option>
+              <option value="discrepancy">Ca lệch tiền</option>
+            </select>
+            <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" style="font-size: 18px;">expand_more</span>
+          </div>
+        </div>
+
         <!-- Reset & Actions -->
         <div>
           <button 
@@ -161,10 +233,10 @@ const formatDateTime = (dateTimeStr) => {
             <tr v-if="loading" class="text-center">
               <td colspan="9" class="py-10 text-gray-400">Đang tải dữ liệu...</td>
             </tr>
-            <tr v-else-if="activityLogs.length === 0" class="text-center">
+            <tr v-else-if="filteredLogs.length === 0" class="text-center">
               <td colspan="9" class="py-10 text-gray-400">Không tìm thấy lịch sử hoạt động nào.</td>
             </tr>
-            <tr v-else v-for="(log, index) in activityLogs" :key="log.id" class="hover:bg-gray-50/50 transition-colors">
+            <tr v-else v-for="(log, index) in filteredLogs" :key="log.id" class="hover:bg-gray-50/50 transition-colors">
               <!-- STT -->
               <td class="py-4 px-6 text-center font-medium text-gray-500">{{ index + 1 }}</td>
 
@@ -273,14 +345,28 @@ const formatDateTime = (dateTimeStr) => {
 
               <!-- TRẠNG THÁI -->
               <td class="py-4 px-6 text-center">
-                <span 
-                  class="px-3 py-1 text-xs font-bold rounded-full shadow-sm"
-                  :class="log.trangThai === 0 
-                    ? 'bg-green-50 text-green-600 border border-green-100' 
-                    : 'bg-red-50 text-red-600 border border-red-100'"
-                >
-                  {{ log.trangThai === 0 ? 'Đang chạy' : 'Đã đóng' }}
-                </span>
+                <div class="flex flex-col gap-1.5 items-center justify-center">
+                  <span 
+                    class="px-2.5 py-0.5 text-xs font-bold rounded-full shadow-sm"
+                    :class="log.trangThai === 0 
+                      ? 'bg-green-50 text-green-600 border border-green-100' 
+                      : 'bg-red-50 text-red-600 border border-red-100'"
+                  >
+                    {{ log.trangThai === 0 ? 'Đang chạy' : 'Đã đóng' }}
+                  </span>
+                  
+                  <span 
+                    v-if="log.trangThai === 1"
+                    class="px-2 py-0.5 text-[10px] font-bold rounded-md"
+                    :class="!log.trangThaiDoiSoat 
+                      ? 'bg-amber-50 text-amber-600 border border-amber-100' 
+                      : log.trangThaiDoiSoat === 1 
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                        : 'bg-red-50 text-red-500 border border-red-100'"
+                  >
+                    {{ !log.trangThaiDoiSoat ? 'Chờ đối soát' : log.trangThaiDoiSoat === 1 ? 'Đã đối soát' : 'Sai lệch' }}
+                  </span>
+                </div>
               </td>
 
               <!-- CHI TIẾT -->
@@ -404,15 +490,83 @@ const formatDateTime = (dateTimeStr) => {
               </span>
             </div>
           </div>
+
+          <!-- Manager Audit Section -->
+          <div 
+            v-if="selectedLog.trangThai === 1"
+            class="border-t border-gray-150 pt-5 space-y-4"
+          >
+            <h4 class="text-sm font-bold text-[#0D2533] flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-sm text-[#EF972D]">admin_panel_settings</span>
+              Kế Toán Đối Soát (Dành Cho Quản Lý)
+            </h4>
+
+            <!-- If already audited -->
+            <div v-if="selectedLog.trangThaiDoiSoat" class="bg-gray-50 p-4 rounded-xl border border-gray-150 space-y-2 text-xs">
+              <div class="flex justify-between items-center font-semibold">
+                <span class="text-gray-400">Trạng thái:</span>
+                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold">Đã đối soát</span>
+              </div>
+              <div v-if="selectedLog.phuongAnXuLy" class="flex justify-between items-center font-semibold">
+                <span class="text-gray-400">Phương án xử lý:</span>
+                <span class="text-gray-800">
+                  {{ selectedLog.phuongAnXuLy === 'TRU_LUONG' ? 'Khấu trừ vào lương' : selectedLog.phuongAnXuLy === 'CHI_PHI_CUA_HANG' ? 'Hạch toán chi phí' : 'Không xử lý / Bỏ qua' }}
+                </span>
+              </div>
+              <div v-if="selectedLog.ghiChuDoiSoat" class="mt-2 text-gray-700">
+                <span class="text-gray-400 block mb-0.5">Ghi chú đối soát:</span>
+                <p class="italic bg-white p-2.5 rounded border border-gray-100">{{ selectedLog.ghiChuDoiSoat }}</p>
+              </div>
+            </div>
+
+            <!-- If NOT audited yet -->
+            <div v-else class="space-y-4">
+              <!-- If there is a discrepancy, choose resolution -->
+              <div v-if="selectedLog.tienChenhLech !== 0" class="space-y-1.5">
+                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block">Phương án xử lý lệch tiền *</label>
+                <div class="relative">
+                  <select 
+                    v-model="auditAction"
+                    class="w-full appearance-none border border-gray-200 bg-white py-2 pl-3 pr-10 rounded-xl outline-none text-xs transition-all cursor-pointer font-bold text-gray-700 focus:border-[#EF972D]"
+                  >
+                    <option value="TRU_LUONG">Khấu trừ chênh lệch vào lương nhân viên trực ca</option>
+                    <option value="CHI_PHI_CUA_HANG">Hạch toán lỗ vào chi phí vận hành cửa hàng</option>
+                    <option value="KHONG_XU_LY">Bỏ qua / Không xử lý chênh lệch này</option>
+                  </select>
+                  <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 font-bold" style="font-size: 16px;">expand_more</span>
+                </div>
+              </div>
+
+              <!-- Notes for audit -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block">Ý kiến / Ghi chú đối soát</label>
+                <textarea 
+                  v-model="auditNotes"
+                  rows="2"
+                  placeholder="Nhập ghi chú xử lý chênh lệch hoặc phê duyệt ca..."
+                  class="w-full px-3 py-2 bg-white border border-gray-200 focus:border-[#EF972D] rounded-xl outline-none text-xs transition-all"
+                ></textarea>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Footer -->
-        <div class="p-6 border-t border-gray-50 flex items-center justify-end bg-gray-50/50">
+        <div class="p-6 border-t border-gray-50 flex items-center justify-end gap-3 bg-gray-50/50">
           <button 
             @click="closeDetailsModal" 
-            class="px-5 py-2.5 bg-gradient-to-r from-[#FFB74D] to-[#EF972D] text-white rounded-xl shadow-md hover:shadow-lg font-bold text-sm transition-all cursor-pointer"
+            class="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl font-bold text-sm transition-all cursor-pointer"
           >
             Đóng lại
+          </button>
+          <button 
+            v-if="selectedLog.trangThai === 1 && !selectedLog.trangThaiDoiSoat"
+            @click="handleApproveAudit(selectedLog)"
+            :disabled="isAuditing"
+            class="px-5 py-2.5 bg-gradient-to-r from-[#FFB74D] to-[#EF972D] hover:from-[#EF972D] hover:to-[#E68A1E] text-white rounded-xl shadow-md hover:shadow-lg font-bold text-sm transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            <span v-if="isAuditing" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            Xác nhận Đối soát
           </button>
         </div>
       </div>

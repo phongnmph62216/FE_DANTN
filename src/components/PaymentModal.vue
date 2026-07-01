@@ -180,12 +180,12 @@ onMounted(() => {
       <div class="p-6 space-y-5 flex-grow overflow-y-auto max-h-[75vh]">
         
         <!-- Total amount box -->
-        <div class="flex justify-between items-center p-4 bg-gradient-to-br from-[#8C2D43]/5 to-[#0D2533]/5 border border-[#8C2D43]/10 rounded-2xl">
+        <div class="flex justify-between items-center p-4 bg-gradient-to-br from-[#EF972D]/5 to-[#0D2533]/5 border border-[#EF972D]/10 rounded-2xl">
           <div class="space-y-1">
             <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Mã hóa đơn: {{ invoiceCode }}</p>
             <span class="text-sm font-bold text-gray-700">Tổng tiền thanh toán</span>
           </div>
-          <span class="text-2xl font-black text-[#8C2D43]">{{ formatCurrency(totalAmount) }}</span>
+          <span class="text-2xl font-black text-[#EF972D]">{{ formatCurrency(totalAmount) }}</span>
         </div>
 
         <!-- Payment Mode Tabs -->
@@ -303,11 +303,11 @@ onMounted(() => {
             </div>
             <div class="flex justify-between text-gray-500">
               <span>Nội dung chuyển:</span>
-              <span class="font-mono font-black text-[#8C2D43] bg-[#8C2D43]/5 px-2 py-0.5 rounded select-all">{{ invoiceCode }}</span>
+              <span class="font-mono font-black text-[#EF972D] bg-[#EF972D]/5 px-2 py-0.5 rounded select-all">{{ invoiceCode }}</span>
             </div>
             <div class="flex justify-between text-gray-500">
               <span>Số tiền QR:</span>
-              <span class="font-bold text-[#8C2D43]">{{ formatCurrency(Math.max(0, totalAmount - tienMat)) }}</span>
+              <span class="font-bold text-[#EF972D]">{{ formatCurrency(Math.max(0, totalAmount - tienMat)) }}</span>
             </div>
           </div>
         </div>

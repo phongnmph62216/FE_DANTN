@@ -51,8 +51,12 @@ onUnmounted(() => {
       <!-- Main Header -->
       <header class="fixed top-[36px] w-full z-50 bg-surface/95 backdrop-blur-md border-b border-outline-variant/30 flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4 max-w-container-max mx-auto left-1/2 -translate-x-1/2">
         <!-- Logo -->
-        <RouterLink class="text-title-md md:text-display-xl font-display-xl font-bold tracking-[0.2em] text-on-background shrink-0" to="/">
-          BEE STYLISH
+        <RouterLink class="shrink-0 flex items-center" to="/">
+          <img
+            alt="Bee Stylish Logo"
+            class="h-14 md:h-20 object-contain"
+            src="/logoteam.png"
+          />
         </RouterLink>
         <!-- Desktop Navigation -->
         <nav class="hidden md:flex items-center gap-6 lg:gap-8 mx-auto">
@@ -240,8 +244,12 @@ onUnmounted(() => {
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-gutter px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto mb-12">
         <!-- Col 1: Brand & Contact -->
         <div class="lg:col-span-2 flex flex-col gap-6">
-          <RouterLink class="text-headline-lg font-headline-lg text-on-surface dark:text-surface-bright font-bold tracking-[0.2em] mb-2" to="/">
-            BEE STYLISH
+          <RouterLink class="shrink-0 flex items-center mb-2" to="/">
+            <img
+              alt="Bee Stylish Logo"
+              class="h-16 md:h-24 object-contain"
+              src="/logoteam.png"
+            />
           </RouterLink>
           <p class="text-on-surface-variant max-w-sm">
             Thương hiệu thời trang ứng dụng mang đến trải nghiệm mua sắm đẳng cấp với các sản phẩm tối giản, thanh lịch và chất lượng.
