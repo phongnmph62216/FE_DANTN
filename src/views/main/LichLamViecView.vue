@@ -20,6 +20,10 @@ const selectedEmployeeId = ref('')
 const employees = ref([])
 const shiftsList = ref([])
 
+const activeShiftsList = computed(() => {
+  return shiftsList.value.filter(s => Number(s.trangThai) === 1 || s.id == currentSchedule.value.idCaLamViec)
+})
+
 // Scheduled assignments list
 const schedules = ref([])
 
@@ -96,6 +100,37 @@ const errors = ref({
   ngayLamViec: ''
 })
 
+// Toast notification alert state
+const toast = ref({ show: false, message: '', type: 'success' })
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 4000)
+}
+
+// Custom confirm dialog state
+const confirmModal = ref({
+  show: false,
+  title: 'Xác nhận',
+  message: '',
+  onConfirm: null
+})
+const showConfirm = (message, onConfirm, title = 'Xác nhận') => {
+  confirmModal.value = {
+    show: true,
+    title,
+    message,
+    onConfirm
+  }
+}
+const handleConfirmAction = () => {
+  if (confirmModal.value.onConfirm) {
+    confirmModal.value.onConfirm()
+  }
+  confirmModal.value.show = false
+}
+
 // Recurrence states
 const repeatType = ref('none') // 'none' or 'custom'
 const showRepeatModal = ref(false)
@@ -130,11 +165,11 @@ const cancelRepeatConfig = () => {
 
 const confirmRepeatConfig = () => {
   if (repeatUnit.value === 'week' && repeatDays.value.length === 0) {
-    alert('Vui lòng chọn ít nhất một ngày trong tuần để lặp lại!')
+    showToast('Vui lòng chọn ít nhất một ngày trong tuần để lặp lại!', 'warning')
     return
   }
   if (!repeatEndDate.value) {
-    alert('Vui lòng chọn ngày kết thúc lặp lại!')
+    showToast('Vui lòng chọn ngày kết thúc lặp lại!', 'warning')
     return
   }
   showRepeatModal.value = false
@@ -217,7 +252,11 @@ const fetchData = async () => {
       api.get('/api/v1/lich-lam-viec')
     ])
     if (resEmp.data && resEmp.data.content) {
-      employees.value = resEmp.data.content
+      // Chỉ giữ lại nhân viên, loại bỏ quản lý/admin
+      employees.value = resEmp.data.content.filter(emp => {
+        const roleName = (emp.tenVaiTro || '').toLowerCase()
+        return !(roleName.includes('quan') || roleName.includes('admin') || roleName.includes('quản'))
+      })
     }
     if (resShift.data) {
       shiftsList.value = resShift.data
@@ -433,11 +472,12 @@ const saveSchedule = async () => {
     }
     try {
       await api.put(`/api/v1/lich-lam-viec/${currentSchedule.value.id}`, payload)
+      showToast('Cập nhật lịch trực thành công!', 'success')
       await fetchData()
       closeModal()
     } catch (e) {
       console.error('API error on schedule edit', e)
-      alert(e.response?.data?.message || 'Có lỗi xảy ra khi cập nhật lịch trực')
+      showToast(e.response?.data?.message || 'Có lỗi xảy ra khi cập nhật lịch trực', 'error')
     }
   } else {
     // Generate dates based on recurrence rules
@@ -467,11 +507,12 @@ const saveSchedule = async () => {
         }
       }
       await Promise.all(promises)
+      showToast('Phân ca làm việc thành công!', 'success')
       await fetchData()
       closeModal()
     } catch (e) {
       console.error('API error on schedule create', e)
-      alert(e.response?.data?.message || 'Có lỗi xảy ra khi phân ca làm việc')
+      showToast(e.response?.data?.message || 'Có lỗi xảy ra khi phân ca làm việc', 'error')
     }
   }
 }
@@ -479,26 +520,87 @@ const saveSchedule = async () => {
 // Delete shift assignment
 const deleteSchedule = async () => {
   if (!currentSchedule.value.id) return
-  if (!confirm('Bạn có chắc chắn muốn xóa lịch trực này không?')) return
+  showConfirm(
+    'Bạn có chắc chắn muốn xóa lịch trực này không? Hành động này không thể hoàn tác.',
+    async () => {
+      try {
+        await api.delete(`/api/v1/lich-lam-viec/${currentSchedule.value.id}`)
+        showToast('Xóa lịch trực thành công!', 'success')
+        await fetchData()
+        closeModal()
+      } catch (e) {
+        console.error('API error on schedule delete', e)
+        showToast(e.response?.data?.message || 'Có lỗi xảy ra khi xóa lịch trực', 'error')
+      }
+    },
+    'Xóa lịch trực'
+  )
+}
 
+// Template download
+const downloadTemplate = async () => {
   try {
-    await api.delete(`/api/v1/lich-lam-viec/${currentSchedule.value.id}`)
-    await fetchData()
-    closeModal()
-  } catch (e) {
-    console.error('API error on schedule delete', e)
-    alert(e.response?.data?.message || 'Có lỗi xảy ra khi xóa lịch trực')
+    showToast('Đang tải xuống tệp biểu mẫu excel lịch làm việc...', 'info')
+    const res = await api.get('/api/v1/lich-lam-viec/download-template', { responseType: 'blob' })
+    
+    // Create download link
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'mau_import_lich_lam_viec.xlsx')
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+    
+    showToast('Tải tệp biểu mẫu thành công!', 'success')
+  } catch (error) {
+    console.error('Failed to download template', error)
+    showToast('Tải tệp biểu mẫu thất bại!', 'error')
   }
 }
 
-// Dummy Template download
-const downloadTemplate = () => {
-  alert('Đang tải xuống tệp biểu mẫu excel lịch làm việc...')
-}
-
-// Dummy Excel import
+// Excel import
 const importExcel = () => {
-  alert('Tính năng nhập dữ liệu Excel đang được khởi tạo...')
+  const fileSelector = document.createElement('input')
+  fileSelector.type = 'file'
+  fileSelector.accept = '.xlsx, .xls'
+  fileSelector.onchange = async (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+
+    showToast('Đang tải lên và xử lý tệp Excel...', 'info')
+    
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const res = await api.post('/api/v1/lich-lam-viec/import-excel', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+      
+      const message = res.data || 'Nhập lịch làm việc từ Excel thành công!'
+      
+      if (message.includes('Bỏ qua:') || message.includes('Chi tiết lỗi:')) {
+        showConfirm(
+          message,
+          () => {},
+          'Kết quả nhập dữ liệu Excel'
+        )
+      } else {
+        showToast(message, 'success')
+      }
+      
+      await fetchData()
+    } catch (e) {
+      console.error('API error on Excel import', e)
+      showToast(e.response?.data?.message || 'Có lỗi xảy ra khi nhập dữ liệu từ Excel', 'error')
+    }
+  }
+  fileSelector.click()
 }
 
 // Get display helpers for list view
@@ -797,7 +899,7 @@ const getShiftInfo = (shiftId) => {
                 :class="errors.idCaLamViec ? 'border-red-300' : 'border-gray-200'"
               >
                 <option value="">Chọn ca làm việc...</option>
-                <option v-for="s in shiftsList" :key="s.id" :value="s.id">
+                <option v-for="s in activeShiftsList" :key="s.id" :value="s.id">
                   {{ s.ten }} ({{ s.gioBatDau ? s.gioBatDau.substring(0, 5) : '' }} - {{ s.gioKetThuc ? s.gioKetThuc.substring(0, 5) : '' }})
                 </option>
               </select>
@@ -975,9 +1077,73 @@ const getShiftInfo = (shiftId) => {
       </div>
     </div>
   </div>
+
+  <!-- Custom Confirm Modal -->
+  <div v-if="confirmModal.show" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 transition-all duration-300">
+    <div class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-gray-100 flex flex-col animate-scaleIn">
+      <!-- Header -->
+      <div class="p-5 border-b border-gray-100 flex items-center gap-3 bg-[#EF972D]/10 text-[#EF972D]">
+        <span class="material-symbols-outlined text-[24px]">warning</span>
+        <h3 class="font-headline-sm text-base font-bold">{{ confirmModal.title }}</h3>
+      </div>
+      <!-- Body -->
+      <div class="p-6 text-sm text-gray-650 font-body-md leading-relaxed">
+        {{ confirmModal.message }}
+      </div>
+      <!-- Footer -->
+      <div class="p-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+        <button 
+          @click="confirmModal.show = false"
+          class="px-4 py-2 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl font-bold text-xs cursor-pointer transition-colors"
+        >
+          Hủy
+        </button>
+        <button 
+          @click="handleConfirmAction"
+          class="px-5 py-2 bg-[#EF972D] hover:bg-[#D87D15] text-white rounded-xl font-bold text-xs shadow-md hover:shadow-lg transition-all cursor-pointer"
+        >
+          Đồng ý
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Alert -->
+  <div 
+    v-if="toast.show" 
+    class="fixed bottom-5 right-5 z-[10001] flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border transition-all duration-300 transform translate-y-0"
+    :class="{
+      'bg-emerald-50 border-emerald-200 text-emerald-800': toast.type === 'success',
+      'bg-red-50 border-red-200 text-red-800': toast.type === 'error',
+      'bg-blue-50 border-blue-200 text-blue-800': toast.type === 'info',
+      'bg-amber-50 border-amber-200 text-amber-800': toast.type === 'warning'
+    }"
+  >
+    <span class="material-symbols-outlined text-lg">
+      {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : toast.type === 'warning' ? 'warning' : 'info' }}
+    </span>
+    <span class="text-sm font-semibold font-body-md">{{ toast.message }}</span>
+    <button @click="toast.show = false" class="ml-4 text-gray-400 hover:text-gray-650 cursor-pointer">
+      <span class="material-symbols-outlined text-sm">close</span>
+    </button>
+  </div>
 </template>
 
 <style>
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s ease-out forwards;
+}
 /* FullCalendar custom styling to match dashboard aesthetics */
 .fullcalendar-theme-wrapper {
   --fc-border-color: #f1f3f5;

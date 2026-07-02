@@ -2,6 +2,15 @@
 import { ref, onMounted, computed } from 'vue'
 import api from '@/services/api'
 
+// Toast notification alert state
+const toast = ref({ show: false, message: '', type: 'success' })
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 4000)
+}
+
 // States
 const activityLogs = ref([])
 const loading = ref(false)
@@ -67,7 +76,7 @@ const handleApproveAudit = async (log) => {
     }
     
     await api.put(`/api/v1/giao-ca/doi-soat/${log.id}`, payload)
-    alert('Đối soát và duyệt ca trực thành công!')
+    showToast('Đối soát và duyệt ca trực thành công!', 'success')
     
     // Reset audit inputs
     auditNotes.value = ''
@@ -77,7 +86,7 @@ const handleApproveAudit = async (log) => {
     closeDetailsModal()
   } catch (error) {
     console.error('Error auditing shift:', error)
-    alert(error.response?.data?.message || 'Có lỗi xảy ra khi đối soát ca trực.')
+    showToast(error.response?.data?.message || 'Có lỗi xảy ra khi đối soát ca trực.', 'error')
   } finally {
     isAuditing.value = false
   }
@@ -90,9 +99,23 @@ onMounted(() => {
 // Details Modal State
 const showDetailsModal = ref(false)
 const selectedLog = ref(null)
+const selectedLogVouchers = ref([])
+
+const fetchSelectedLogVouchers = async (logId) => {
+  try {
+    const res = await api.get(`/api/v1/giao-ca/phieu-chi/${logId}`)
+    selectedLogVouchers.value = res.data || []
+  } catch (error) {
+    console.error('Error fetching vouchers for log:', error)
+  }
+}
 
 const openDetailsModal = (log) => {
   selectedLog.value = log
+  selectedLogVouchers.value = []
+  if (log && log.id) {
+    fetchSelectedLogVouchers(log.id)
+  }
   // Pre-fill audit notes/action if already audited
   if (log.trangThaiDoiSoat) {
     auditAction.value = log.phuongAnXuLy || 'KHONG_XU_LY'
@@ -106,6 +129,7 @@ const openDetailsModal = (log) => {
 
 const closeDetailsModal = () => {
   selectedLog.value = null
+  selectedLogVouchers.value = []
   showDetailsModal.value = false
 }
 
@@ -449,14 +473,52 @@ const formatDateTime = (dateTimeStr) => {
                 <span class="text-sm font-bold text-gray-700">{{ formatCurrency(selectedLog.tienMatThuTrongCa) }}</span>
               </div>
               <div class="flex justify-between items-center py-1.5 border-b border-gray-50 col-span-2">
+                <span class="text-sm text-gray-500">Tiền mặt chi ra / Hoàn trả:</span>
+                <span class="text-sm font-bold text-red-500">- {{ formatCurrency(selectedLog.tienMatChiRa) }}</span>
+              </div>
+              <div class="flex justify-between items-center py-1.5 border-b border-gray-50 col-span-2">
                 <span class="text-sm text-gray-500">Tổng tiền mặt lý thuyết:</span>
                 <span class="text-sm font-bold text-gray-700">
-                  {{ formatCurrency((selectedLog.tienMatDauCa || 0) + (selectedLog.tienMatThuTrongCa || 0)) }}
+                  {{ formatCurrency((selectedLog.tienMatDauCa || 0) + (selectedLog.tienMatThuTrongCa || 0) - (selectedLog.tienMatChiRa || 0)) }}
                 </span>
               </div>
               <div class="flex justify-between items-center py-1.5 border-b border-gray-50 col-span-2">
                 <span class="text-sm text-gray-500">Tiền mặt thực tế cốp ca:</span>
                 <span class="text-sm font-bold text-[#0D2533]">{{ formatCurrency(selectedLog.tienMatThucTeChotCa) }}</span>
+              </div>
+              <div class="flex justify-between items-center py-1.5 border-b border-gray-50 col-span-2">
+                <span class="text-sm text-gray-500">Tiền cốp để lại ca sau:</span>
+                <span class="text-sm font-bold text-gray-700">{{ formatCurrency(selectedLog.tienGiaoCaSau) }}</span>
+              </div>
+              <div class="flex justify-between items-center py-1.5 border-b border-gray-50 col-span-2">
+                <span class="text-sm text-gray-500">Tiền nộp lại quản lý:</span>
+                <span class="text-sm font-bold text-emerald-600">{{ formatCurrency(Math.max(0, (selectedLog.tienMatThucTeChotCa || 0) - (selectedLog.tienGiaoCaSau || 0))) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shift Expenditures List -->
+          <div class="space-y-3">
+            <h4 class="text-sm font-bold text-[#0D2533] border-b border-gray-100 pb-2">Phiếu Chi Tiền Mặt Trong Ca</h4>
+            <div class="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+              <div v-if="selectedLogVouchers.length === 0" class="text-center py-4 text-gray-400 text-xs italic">
+                Không ghi nhận phiếu chi tiền mặt nào trong ca trực này.
+              </div>
+              <div 
+                v-else 
+                v-for="voucher in selectedLogVouchers" 
+                :key="voucher.id"
+                class="flex justify-between items-start bg-gray-50 hover:bg-gray-100/70 p-3 rounded-xl border border-gray-100 transition-colors text-xs"
+              >
+                <div class="space-y-0.5">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-700">{{ voucher.maPhieu }}</span>
+                    <span class="text-[10px] text-gray-400">({{ voucher.ngayTao }})</span>
+                  </div>
+                  <p class="text-gray-500">Lý do: {{ voucher.lyDo }}</p>
+                  <p class="text-[10px] text-gray-400">Người lập: {{ voucher.nguoiTao }}</p>
+                </div>
+                <span class="font-bold text-red-500 shrink-0 ml-3">- {{ formatCurrency(voucher.soTien) }}</span>
               </div>
             </div>
           </div>
@@ -489,6 +551,14 @@ const formatDateTime = (dateTimeStr) => {
                 {{ formatDiff(selectedLog.tienChenhLech) }}
               </span>
             </div>
+          </div>
+
+          <!-- Employee Discrepancy Explanation -->
+          <div v-if="selectedLog.ghiChu && selectedLog.ghiChu.trim()" class="bg-amber-50/50 p-4 rounded-xl border border-amber-100 space-y-1 text-xs">
+            <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Giải trình chênh lệch của nhân viên</span>
+            <p class="text-gray-700 leading-relaxed italic bg-white p-2.5 rounded-lg border border-amber-100/50 font-medium">
+              "{{ selectedLog.ghiChu }}"
+            </p>
           </div>
 
           <!-- Manager Audit Section -->
@@ -571,5 +641,41 @@ const formatDateTime = (dateTimeStr) => {
         </div>
       </div>
     </div>
+
+    <!-- Toast Notifications -->
+    <div 
+      v-if="toast.show" 
+      class="fixed bottom-5 right-5 z-[9999] transform translate-y-0 opacity-100 transition-all duration-300 pointer-events-none"
+    >
+      <div 
+        class="flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border text-white font-medium text-sm animate-slide-up"
+        :class="{
+          'bg-gradient-to-r from-emerald-500 to-teal-600 border-emerald-400': toast.type === 'success',
+          'bg-gradient-to-r from-rose-500 to-red-600 border-rose-400': toast.type === 'error',
+          'bg-gradient-to-r from-[#FFB74D] to-[#EF972D] border-orange-300': toast.type === 'info'
+        }"
+      >
+        <span class="material-symbols-outlined text-[20px] shrink-0">
+          {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'cancel' : 'info' }}
+        </span>
+        <span class="leading-snug whitespace-pre-line pr-2">{{ toast.message }}</span>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+</style>

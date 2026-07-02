@@ -40,19 +40,42 @@ const formatDateVietnamese = (dateStr) => {
   return dateStr
 }
 
-const getScheduleStatus = (ngayLamViec) => {
+const getScheduleStatus = (item) => {
+  if (!item) return 'upcoming'
   const todayStr = new Date().toLocaleDateString('sv-SE') // YYYY-MM-DD
-  if (ngayLamViec === todayStr) {
-    return 'active' // "Đang làm"
-  } else if (ngayLamViec < todayStr) {
+  if (item.ngayLamViec < todayStr) {
     return 'past' // "Đã qua"
-  } else {
+  }
+  if (item.ngayLamViec > todayStr) {
     return 'upcoming' // "Sắp tới"
   }
+  
+  const shift = getShift(item.idCaLamViec)
+  if (!shift) return 'active'
+  
+  const now = new Date()
+  const [yyyy, mm, dd] = item.ngayLamViec.split('-').map(Number)
+  
+  const [startHour, startMin] = shift.gioBatDau.split(':').map(Number)
+  const shiftStart = new Date(yyyy, mm - 1, dd, startHour, startMin, 0)
+  
+  const [endHour, endMin] = shift.gioKetThuc.split(':').map(Number)
+  let shiftEnd = new Date(yyyy, mm - 1, dd, endHour, endMin, 0)
+  
+  if (shiftEnd < shiftStart) {
+    shiftEnd.setDate(shiftEnd.getDate() + 1)
+  }
+  
+  if (now < shiftStart) {
+    return 'upcoming'
+  } else if (now >= shiftEnd) {
+    return 'past'
+  }
+  return 'active'
 }
 
-const getStatusLabel = (ngayLamViec) => {
-  const status = getScheduleStatus(ngayLamViec)
+const getStatusLabel = (item) => {
+  const status = getScheduleStatus(item)
   if (status === 'active') return 'Đang làm'
   if (status === 'past') return 'Đã qua'
   return 'Sắp tới'
@@ -113,7 +136,7 @@ const resetFilters = () => {
 const filteredSchedules = computed(() => {
   let list = schedules.value
   if (filterStatus.value !== 'all') {
-    list = list.filter(item => getScheduleStatus(item.ngayLamViec) === filterStatus.value)
+    list = list.filter(item => getScheduleStatus(item) === filterStatus.value)
   }
   return list
 })
@@ -126,7 +149,7 @@ const calendarEvents = computed(() => {
     const times = shift ? `${shift.gioBatDau.substring(0, 5)} - ${shift.gioKetThuc.substring(0, 5)}` : ''
     
     let color = '#7E57C2' // Default purple
-    const status = getScheduleStatus(sched.ngayLamViec)
+    const status = getScheduleStatus(sched)
     if (status === 'active') color = '#EF972D' // orange
     else if (status === 'past') color = '#EF9A9A' // soft red
     else if (status === 'upcoming') color = '#42A5F5' // blue
@@ -157,7 +180,7 @@ const exportExcel = () => {
       const shift = getShift(item.idCaLamViec)
       const shiftName = shift ? shift.ten : ''
       const shiftTime = shift ? `${shift.gioBatDau.substring(0, 5)} - ${shift.gioKetThuc.substring(0, 5)}` : ''
-      const statusText = getStatusLabel(item.ngayLamViec)
+      const statusText = getStatusLabel(item)
       const note = item.ghiChu || '--'
 
       csvContent += `"${index + 1}","${formatDateVietnamese(item.ngayLamViec)}","${shiftName}","${shiftTime}","${note}","${statusText}"\n`
@@ -320,13 +343,13 @@ onMounted(() => {
               </td>
               <td class="py-4 px-6 text-center">
                 <span 
-                  v-if="getScheduleStatus(item.ngayLamViec) === 'active'"
+                  v-if="getScheduleStatus(item) === 'active'"
                   class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-[#EF972D] text-white shadow-sm"
                 >
                   Đang làm
                 </span>
                 <span 
-                  v-else-if="getScheduleStatus(item.ngayLamViec) === 'past'"
+                  v-else-if="getScheduleStatus(item) === 'past'"
                   class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-500 border border-red-150"
                 >
                   Đã qua

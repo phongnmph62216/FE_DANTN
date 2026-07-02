@@ -14,6 +14,80 @@ const currentShift = ref(null)
 const notes = ref('')
 const keepForNextShift = ref(0)
 
+// Expenditure Voucher States
+const vouchersList = ref([])
+const showVoucherModal = ref(false)
+const voucherAmount = ref(null)
+const voucherReason = ref('')
+const isSubmittingVoucher = ref(false)
+
+const maxAllowedVoucherAmount = computed(() => {
+  if (!currentShift.value) return 0
+  const startingCash = currentShift.value.previousShiftCash || 0
+  const totalSpent = vouchersList.value.reduce((sum, v) => sum + (v.soTien || 0), 0)
+  return Math.max(0, startingCash - totalSpent)
+})
+
+const openCreateVoucherModal = () => {
+  voucherAmount.value = null
+  voucherReason.value = ''
+  showVoucherModal.value = true
+}
+
+const closeCreateVoucherModal = () => {
+  showVoucherModal.value = false
+}
+
+const fetchVouchers = async () => {
+  if (!currentShift.value) return
+  const idGiaoCa = currentShift.value.giaoCaId || currentShift.value.id || currentShift.value.scheduleId
+  if (!idGiaoCa) return
+  try {
+    const res = await api.get(`/api/v1/giao-ca/phieu-chi/${idGiaoCa}`)
+    vouchersList.value = res.data || []
+  } catch (error) {
+    console.error('Error fetching vouchers:', error)
+  }
+}
+
+const submitVoucher = async () => {
+  if (!voucherAmount.value || voucherAmount.value <= 0) {
+    showToast('Số tiền chi phải lớn hơn 0.', 'warning')
+    return
+  }
+  if (voucherAmount.value > maxAllowedVoucherAmount.value) {
+    showToast(`Số tiền chi vượt quá giới hạn cho phép. Bạn chỉ có thể chi tối đa ${formatCurrency(maxAllowedVoucherAmount.value)}.`, 'warning')
+    return
+  }
+  if (!voucherReason.value.trim()) {
+    showToast('Vui lòng nhập lý do chi tiền.', 'warning')
+    return
+  }
+
+  isSubmittingVoucher.value = true
+  try {
+    const idGiaoCa = currentShift.value.giaoCaId || currentShift.value.id || currentShift.value.scheduleId
+    const payload = {
+      idGiaoCa,
+      soTien: voucherAmount.value,
+      lyDo: voucherReason.value,
+      nguoiTao: authStore.user?.hoVaTen || 'Nhân viên'
+    }
+
+    await api.post('/api/v1/giao-ca/phieu-chi', payload)
+    showToast('Tạo phiếu chi thành công!', 'success')
+    closeCreateVoucherModal()
+    
+    // Refresh shift status data & vouchers
+    await fetchData()
+  } catch (error) {
+    console.error('Error creating voucher:', error)
+    showToast(error.response?.data?.message || 'Có lỗi xảy ra khi tạo phiếu chi.', 'error')
+  } finally {
+    isSubmittingVoucher.value = false
+  }
+}
+
 // Toast alert state
 const toast = ref({ show: false, message: '', type: 'success' })
 const showToast = (message, type = 'success') => {
@@ -69,12 +143,14 @@ const fetchData = async () => {
           notes.value = resDetail.data.ghiChu || ''
         } else {
           currentShift.value = resShift.data
-          keepForNextShift.value = resShift.data.previousShiftCash || 0
+          keepForNextShift.value = Math.max(0, (resShift.data.previousShiftCash || 0) - (resShift.data.tienMatChiRa || 0))
         }
       } else {
         currentShift.value = resShift.data
-        keepForNextShift.value = resShift.data.previousShiftCash || 0
+        keepForNextShift.value = Math.max(0, (resShift.data.previousShiftCash || 0) - (resShift.data.tienMatChiRa || 0))
       }
+      // Load expenditures
+      await fetchVouchers()
     }
   } catch (error) {
     console.error('Error fetching shift status:', error)
@@ -145,6 +221,29 @@ const isFormValid = computed(() => {
     return false
   }
   return true
+})
+
+const canCloseShift = computed(() => {
+  if (!currentShift.value || currentShift.value.status === 'CLOSED') return true
+  if (!currentShift.value.ngayLamViec || !currentShift.value.gioKetThuc) return true
+
+  const now = new Date()
+  const todayStr = currentShift.value.ngayLamViec
+  const endTimeStr = currentShift.value.gioKetThuc
+  
+  const [yyyy, mm, dd] = todayStr.split('-').map(Number)
+  const [hour, min, sec] = endTimeStr.split(':').map(Number)
+  const shiftEnd = new Date(yyyy, mm - 1, dd, hour, min, sec || 0)
+  
+  if (currentShift.value.gioBatDau) {
+    const [startHour, startMin] = currentShift.value.gioBatDau.split(':').map(Number)
+    const shiftStart = new Date(yyyy, mm - 1, dd, startHour, startMin, 0)
+    if (shiftEnd < shiftStart) {
+      shiftEnd.setDate(shiftEnd.getDate() + 1)
+    }
+  }
+
+  return now >= shiftEnd
 })
 
 // Submit Shift Handover
@@ -310,6 +409,46 @@ const resetCalculator = () => {
             </div>
           </div>
         </div>
+
+        <!-- Expenditure Vouchers (Phiếu chi trong ca) Card -->
+        <div class="bg-white rounded-2xl p-6 shadow-xl border border-gray-150 space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h3 class="font-bold text-[#0D2533] flex items-center gap-2">
+              <span class="material-symbols-outlined text-[20px] text-[#EF972D]">payments</span>
+              Phiếu Chi Trong Ca
+            </h3>
+            <button 
+              v-if="currentShift.status !== 'CLOSED'"
+              @click="openCreateVoucherModal"
+              class="text-xs bg-[#EF972D] hover:bg-[#D87D15] text-white px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+            >
+              <span class="material-symbols-outlined text-[14px]">add</span>
+              Thêm phiếu chi
+            </button>
+          </div>
+
+          <div class="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+            <div v-if="vouchersList.length === 0" class="text-center py-6 text-gray-400 text-xs italic">
+              Chưa có phiếu chi nào được tạo trong ca này.
+            </div>
+            <div 
+              v-else 
+              v-for="voucher in vouchersList" 
+              :key="voucher.id"
+              class="flex justify-between items-start bg-gray-50 hover:bg-gray-100/70 p-3 rounded-xl border border-gray-100 transition-colors text-xs"
+            >
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-gray-700">{{ voucher.maPhieu }}</span>
+                  <span class="text-[10px] text-gray-400 font-medium">({{ formatDateTime(voucher.ngayTao) }})</span>
+                </div>
+                <p class="text-gray-500 font-medium leading-relaxed">Lý do: {{ voucher.lyDo }}</p>
+                <p class="text-[10px] text-gray-400">Người chi: {{ voucher.nguoiTao }}</p>
+              </div>
+              <span class="font-bold text-red-500 shrink-0 ml-3">- {{ formatCurrency(voucher.soTien) }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- RIGHT COLUMN: Polyme Calculator & Verification -->
@@ -445,11 +584,17 @@ const resetCalculator = () => {
             </div>
           </div>
 
+          <!-- Warning for early closure -->
+          <div v-if="currentShift.status !== 'CLOSED' && !canCloseShift" class="p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">warning</span>
+            <span>Chưa đến giờ kết thúc ca ({{ currentShift.gioKetThuc.substring(0, 5) }}). Vui lòng đợi đến hết ca trực mới được chốt ca.</span>
+          </div>
+
           <!-- Submit Button -->
           <button 
             v-if="currentShift.status !== 'CLOSED'"
             @click="handleCloseShift"
-            :disabled="isSubmitting || !isFormValid"
+            :disabled="isSubmitting || !isFormValid || !canCloseShift"
             class="w-full py-3.5 bg-[#EF972D] hover:bg-[#D87D15] disabled:bg-[#EF972D]/50 text-white rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all text-center cursor-pointer flex items-center justify-center gap-2"
           >
             <span v-if="isSubmitting" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
@@ -464,6 +609,79 @@ const resetCalculator = () => {
             Ca trực này đã được chốt và bàn giao thành công
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Voucher Modal -->
+  <div 
+    v-if="showVoucherModal" 
+    class="fixed inset-0 bg-[#0D2533]/40 flex items-center justify-center z-50 p-4 transition-all duration-300 animate-fade-in"
+  >
+    <div 
+      class="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-100 overflow-hidden transform scale-100 transition-all duration-300"
+    >
+      <!-- Header -->
+      <div class="p-5 border-b border-gray-50 flex items-center justify-between bg-gradient-to-r from-[#FFB74D] to-[#EF972D] text-white">
+        <h3 class="text-base font-bold flex items-center gap-2">
+          <span class="material-symbols-outlined">payments</span>
+          Tạo Phiếu Chi Tiền Mặt
+        </h3>
+        <button 
+          @click="closeCreateVoucherModal" 
+          class="p-1 text-white/85 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
+        >
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-5 space-y-4">
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block">Số tiền chi *</label>
+          <div class="relative flex items-center">
+            <input 
+              type="number" 
+              v-model.number="voucherAmount"
+              min="1000"
+              step="1000"
+              class="w-full px-4 py-3 bg-white border border-gray-200 focus:border-[#EF972D] rounded-xl outline-none text-sm font-bold text-gray-800 transition-all pr-12"
+              placeholder="Nhập số tiền chi..."
+            />
+            <span class="absolute right-4 text-xs font-bold text-gray-400">VND</span>
+          </div>
+          <span class="text-[10px] text-gray-400 block mt-1">
+            Số tiền có thể chi tối đa từ tiền cốp: <span class="font-bold text-[#EF972D]">{{ formatCurrency(maxAllowedVoucherAmount) }}</span> (không chạm vào doanh thu).
+          </span>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block">Lý do chi tiền *</label>
+          <textarea 
+            v-model="voucherReason"
+            rows="3"
+            placeholder="Ví dụ: Chi mua nước cho nhân viên, Chi mua giấy in hóa đơn..."
+            class="w-full px-4 py-3 bg-white border border-gray-200 focus:border-[#EF972D] rounded-xl outline-none text-sm transition-all"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-5 border-t border-gray-50 flex items-center justify-end gap-3 bg-gray-50/50">
+        <button 
+          @click="closeCreateVoucherModal" 
+          class="px-4 py-2 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl font-bold text-xs transition-all cursor-pointer"
+        >
+          Hủy bỏ
+        </button>
+        <button 
+          @click="submitVoucher"
+          :disabled="isSubmittingVoucher"
+          class="px-4 py-2 bg-[#EF972D] hover:bg-[#D87D15] disabled:bg-[#EF972D]/50 text-white rounded-xl shadow-md hover:shadow-lg font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+        >
+          <span v-if="isSubmittingVoucher" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          Tạo phiếu chi
+        </button>
       </div>
     </div>
   </div>

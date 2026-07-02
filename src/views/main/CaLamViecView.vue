@@ -13,10 +13,43 @@ const loading = ref(false)
 
 // Shift list data
 const shifts = ref([])
+const todayGiaoCaList = ref([])
 
 // Modal states
 const showModal = ref(false)
 const isEditMode = ref(false)
+
+// Custom confirm dialog state
+const confirmModal = ref({
+  show: false,
+  title: 'Xác nhận',
+  message: '',
+  onConfirm: null
+})
+const showConfirm = (message, onConfirm, title = 'Xác nhận') => {
+  confirmModal.value = {
+    show: true,
+    title,
+    message,
+    onConfirm
+  }
+}
+const handleConfirmAction = () => {
+  if (confirmModal.value.onConfirm) {
+    confirmModal.value.onConfirm()
+  }
+  confirmModal.value.show = false
+}
+
+// Toast notification alert state
+const toast = ref({ show: false, message: '', type: 'success' })
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 4000)
+}
+
 const currentShift = ref({
   id: null,
   ma: '',
@@ -44,15 +77,45 @@ const fetchShifts = async () => {
     if (statusFilter.value !== 'all') {
       params.trangThai = statusFilter.value === 'active' ? 1 : 0
     }
-    const response = await api.get('/api/v1/ca-lam-viec', { params })
+
+    // Get today's start and end timestamps
+    const todayStr = new Date().toLocaleDateString('sv-SE') // YYYY-MM-DD
+    const fromDate = `${todayStr} 00:00:00`
+    const toDate = `${todayStr} 23:59:59`
+
+    const [response, responseGiaoCa] = await Promise.all([
+      api.get('/api/v1/ca-lam-viec', { params }),
+      api.get('/api/v1/giao-ca', { params: { fromDate, toDate } })
+    ])
+
     if (response.data) {
       shifts.value = response.data
+    }
+    if (responseGiaoCa.data) {
+      todayGiaoCaList.value = responseGiaoCa.data
     }
   } catch (error) {
     console.error('Failed to fetch shifts from backend', error)
   } finally {
     loading.value = false
   }
+}
+
+const getTodayGiaoCaStatus = (shift) => {
+  if (!shift) return 'CHUA_MO'
+  const records = todayGiaoCaList.value.filter(gc => gc.idCaLamViec == shift.id || gc.tenCa === shift.ten)
+  if (records.length === 0) {
+    return 'CHUA_MO'
+  }
+  const hasActive = records.some(gc => gc.trangThai === 0)
+  if (hasActive) {
+    return 'DANG_MO'
+  }
+  const hasClosed = records.some(gc => gc.trangThai === 1)
+  if (hasClosed) {
+    return 'DA_DONG'
+  }
+  return 'CHUA_MO'
 }
 
 // Watch filters to reload data from backend
@@ -70,14 +133,25 @@ const filteredShifts = computed(() => {
 })
 
 // Toggle shift status
-const toggleStatus = async (shift) => {
-  try {
-    await api.put(`/api/v1/ca-lam-viec/${shift.id}/trang-thai`)
-    await fetchShifts()
-  } catch (error) {
-    console.error('Failed to update status on server', error)
-    alert(error.response?.data?.message || 'Có lỗi xảy ra khi thay đổi trạng thái ca')
-  }
+const toggleStatus = (shift) => {
+  if (!shift) return
+  const isActivating = Number(shift.trangThai) !== 1
+  const actionText = isActivating ? 'kích hoạt' : 'ngưng hoạt động'
+  
+  showConfirm(
+    `Bạn có chắc chắn muốn ${actionText} ca làm việc "${shift.ten}" không?`,
+    async () => {
+      try {
+        await api.put(`/api/v1/ca-lam-viec/${shift.id}/trang-thai`)
+        showToast(`${isActivating ? 'Kích hoạt' : 'Ngưng hoạt động'} ca làm việc thành công!`, 'success')
+        await fetchShifts()
+      } catch (error) {
+        console.error('Failed to update status on server', error)
+        showToast(error.response?.data?.message || 'Có lỗi xảy ra khi thay đổi trạng thái ca làm việc', 'error')
+      }
+    },
+    'Thay đổi trạng thái ca'
+  )
 }
 
 // Open modal for creating new
@@ -143,21 +217,23 @@ const saveShift = async () => {
     // Update
     try {
       await api.put(`/api/v1/ca-lam-viec/${currentShift.value.id}`, payload)
+      showToast('Cập nhật ca làm việc thành công!', 'success')
       await fetchShifts()
       closeModal()
     } catch (e) {
       console.error('Server error on update', e)
-      alert(e.response?.data?.message || 'Có lỗi xảy ra khi cập nhật ca làm việc')
+      showToast(e.response?.data?.message || 'Có lỗi xảy ra khi cập nhật ca làm việc', 'error')
     }
   } else {
     // Create
     try {
       await api.post('/api/v1/ca-lam-viec', payload)
+      showToast('Thêm mới ca làm việc thành công!', 'success')
       await fetchShifts()
       closeModal()
     } catch (e) {
       console.error('Server error on create', e)
-      alert(e.response?.data?.message || 'Có lỗi xảy ra khi thêm ca làm việc')
+      showToast(e.response?.data?.message || 'Có lỗi xảy ra khi thêm ca làm việc', 'error')
     }
   }
 }
@@ -311,13 +387,14 @@ const clearFilters = () => {
               <th class="py-4 px-6">Thông tin Ca</th>
               <th class="py-4 px-6">Giờ bắt đầu</th>
               <th class="py-4 px-6">Giờ kết thúc</th>
+              <th class="py-4 px-6 text-center w-40">Giao ca hôm nay</th>
               <th class="py-4 px-6 text-center w-32">Trạng thái</th>
               <th class="py-4 px-6 text-center w-28">Thao tác</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50 text-sm">
             <tr v-if="loading" class="text-center">
-              <td colspan="6" class="py-10 text-gray-400">
+              <td colspan="7" class="py-10 text-gray-400">
                 <div class="flex items-center justify-center gap-2">
                   <div class="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent border-[#EF972D]"></div>
                   Đang tải dữ liệu...
@@ -325,7 +402,7 @@ const clearFilters = () => {
               </td>
             </tr>
             <tr v-else-if="filteredShifts.length === 0" class="text-center">
-              <td colspan="6" class="py-10 text-gray-400">Không tìm thấy ca làm việc nào phù hợp.</td>
+              <td colspan="7" class="py-10 text-gray-400">Không tìm thấy ca làm việc nào phù hợp.</td>
             </tr>
             <tr v-else v-for="(shift, index) in filteredShifts" :key="shift.id" class="hover:bg-gray-50/50 transition-colors">
               <!-- STT -->
@@ -354,6 +431,31 @@ const clearFilters = () => {
                   {{ shift.gioKetThuc ? shift.gioKetThuc.substring(0, 5) : '' }}
                 </span>
               </td>
+              <!-- Today's shift handover status -->
+              <td class="py-4 px-6 text-center">
+                <span 
+                  v-if="getTodayGiaoCaStatus(shift) === 'DANG_MO'"
+                  class="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/50 rounded-full inline-flex items-center gap-1.5"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Đang mở
+                </span>
+                <span 
+                  v-else-if="getTodayGiaoCaStatus(shift) === 'DA_DONG'"
+                  class="px-2.5 py-1 text-xs font-bold bg-gray-50 text-gray-500 border border-gray-200 rounded-full inline-flex items-center gap-1.5"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                  Đã đóng
+                </span>
+                <span 
+                  v-else
+                  class="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200/50 rounded-full inline-flex items-center gap-1.5"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                  Chưa mở
+                </span>
+              </td>
+
               <!-- Status Toggle -->
               <td class="py-4 px-6 text-center">
                 <button 
@@ -492,4 +594,71 @@ const clearFilters = () => {
       </div>
     </div>
   </div>
+
+  <!-- Custom Confirm Modal -->
+  <div v-if="confirmModal.show" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 transition-all duration-300">
+    <div class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-gray-100 flex flex-col animate-scaleIn">
+      <!-- Header -->
+      <div class="p-5 border-b border-gray-100 flex items-center gap-3 bg-[#EF972D]/10 text-[#EF972D]">
+        <span class="material-symbols-outlined text-[24px]">warning</span>
+        <h3 class="font-headline-sm text-base font-bold">{{ confirmModal.title }}</h3>
+      </div>
+      <!-- Body -->
+      <div class="p-6 text-sm text-gray-600 leading-relaxed">
+        {{ confirmModal.message }}
+      </div>
+      <!-- Footer -->
+      <div class="p-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+        <button 
+          @click="confirmModal.show = false"
+          class="px-4 py-2 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl font-bold text-xs cursor-pointer transition-colors"
+        >
+          Hủy
+        </button>
+        <button 
+          @click="handleConfirmAction"
+          class="px-5 py-2 bg-[#EF972D] hover:bg-[#D87D15] text-white rounded-xl font-bold text-xs shadow-md hover:shadow-lg transition-all cursor-pointer"
+        >
+          Đồng ý
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Alert -->
+  <div 
+    v-if="toast.show" 
+    class="fixed bottom-5 right-5 z-[10001] flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border transition-all duration-300 transform translate-y-0"
+    :class="{
+      'bg-emerald-50 border-emerald-200 text-emerald-800': toast.type === 'success',
+      'bg-red-50 border-red-200 text-red-800': toast.type === 'error',
+      'bg-blue-50 border-blue-200 text-blue-800': toast.type === 'info',
+      'bg-amber-50 border-amber-200 text-amber-800': toast.type === 'warning'
+    }"
+  >
+    <span class="material-symbols-outlined text-lg">
+      {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : toast.type === 'warning' ? 'warning' : 'info' }}
+    </span>
+    <span class="text-sm font-semibold">{{ toast.message }}</span>
+    <button @click="toast.show = false" class="ml-4 text-gray-400 hover:text-gray-600 cursor-pointer">
+      <span class="material-symbols-outlined text-sm">close</span>
+    </button>
+  </div>
 </template>
+
+<style>
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+</style>

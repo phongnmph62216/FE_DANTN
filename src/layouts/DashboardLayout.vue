@@ -7,6 +7,15 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
+// Toast notification alert state
+const toast = ref({ show: false, message: '', type: 'success' })
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 4000)
+}
+
 const handleLogout = () => {
   authStore.logout()
   router.push('/auth')
@@ -133,10 +142,10 @@ const handleOpenShift = async () => {
     })
     showOpenShiftModal.value = false
     stopClock()
-    alert('Mở ca làm việc thành công!')
+    showToast('Mở ca làm việc thành công!', 'success')
   } catch (error) {
     console.error('Error opening shift:', error)
-    alert(error.response?.data?.message || 'Có lỗi xảy ra khi mở ca làm việc.')
+    showToast(error.response?.data?.message || 'Có lỗi xảy ra khi mở ca làm việc.', 'error')
   } finally {
     isOpeningShift.value = false
   }
@@ -183,6 +192,13 @@ const toggleSidebar = () => {
 // Check active route to highlight menus
 const isActiveRoute = (path) => {
   return route.path === path
+}
+
+const getImageUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+  return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`
 }
 </script>
 
@@ -541,13 +557,6 @@ const isActiveRoute = (path) => {
             <!-- Cho quản lý -->
             <template v-else>
               <RouterLink
-                to="/admin/lich-lam-viec-cua-toi"
-                class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
-                :class="isActiveRoute('/admin/lich-lam-viec-cua-toi') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
-              >
-                Lịch của tôi
-              </RouterLink>
-              <RouterLink
                 to="/admin/lich-lam-viec"
                 class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
                 :class="isActiveRoute('/admin/lich-lam-viec') ? 'text-[#EF972D] font-semibold' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
@@ -687,10 +696,17 @@ const isActiveRoute = (path) => {
           <!-- User Profile Dropdown -->
           <div class="flex items-center gap-3 cursor-pointer hover:bg-surface-container-low p-1.5 pr-3 rounded-full transition-colors border border-transparent hover:border-surface-container-high">
             <img
+              v-if="authStore.user?.anh"
               alt="Admin User Profile"
               class="w-8 h-8 rounded-full object-cover shadow-sm border border-surface-container"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDB9BDjKZNGg7RYSTuluq9Bm2i8A09TR7KVgMbJ8E7SNh6ICgs9ruWENb93tFQ3kPuF0Ktc8pNCkhtzE6XkUtprrh2eb7Ew-2MN6bjHGKh2VCn93eKLDX1ctOjv4BLKQncfirKP374z70_kaaU7xaQ62XzMrkZQ0V52AWquSIMaxCwn5XiQhQqqZxdWpAARchrxYUZdVtNW1FC8Sh9alRiaTX75eDJ7vHJ_u2Yhs8LwOPauLSj9thFrq23Tn-Sgz73P92iYxOcOl64"
+              :src="getImageUrl(authStore.user.anh)"
             />
+            <div
+              v-else
+              class="w-8 h-8 rounded-full bg-[#EF972D] text-white flex items-center justify-center font-bold text-sm shadow-sm"
+            >
+              {{ authStore.user?.hoTen ? authStore.user.hoTen.charAt(0).toUpperCase() : 'A' }}
+            </div>
             <div class="flex flex-col items-start">
               <span class="font-label-sm text-on-surface leading-tight">{{ authStore.user?.hoTen || 'Quản trị viên' }}</span>
             </div>
@@ -793,6 +809,41 @@ const isActiveRoute = (path) => {
           </button>
         </div>
       </div>
+    <!-- Toast Notifications -->
+    <div 
+      v-if="toast.show" 
+      class="fixed bottom-5 right-5 z-[9999] transform translate-y-0 opacity-100 transition-all duration-300 pointer-events-none"
+    >
+      <div 
+        class="flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border text-white font-medium text-sm animate-slide-up"
+        :class="{
+          'bg-gradient-to-r from-emerald-500 to-teal-600 border-emerald-400': toast.type === 'success',
+          'bg-gradient-to-r from-rose-500 to-red-600 border-rose-400': toast.type === 'error',
+          'bg-gradient-to-r from-[#FFB74D] to-[#EF972D] border-orange-300': toast.type === 'info'
+        }"
+      >
+        <span class="material-symbols-outlined text-[20px] shrink-0">
+          {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'cancel' : 'info' }}
+        </span>
+        <span class="leading-snug whitespace-pre-line pr-2">{{ toast.message }}</span>
+      </div>
+    </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+</style>

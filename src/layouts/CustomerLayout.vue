@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import ChatbotWidget from '@/components/ChatbotWidget.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -319,6 +320,7 @@ onUnmounted(() => {
         </div>
       </div>
     </footer>
+    <ChatbotWidget />
   </div>
 </template>
 
