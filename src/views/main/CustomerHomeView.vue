@@ -120,7 +120,7 @@ onMounted(() => {
           <div class="w-[100px] h-[100px] md:w-[140px] md:h-[140px] rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary-container transition-colors p-1">
             <div class="w-full h-full rounded-full bg-cover bg-center group-hover:scale-110 transition-transform duration-500" data-alt="A close-up studio shot of a trendy women's t-shirt folded neatly. High-key lighting, bright white background, editorial fashion style. The fabric texture is crisp and clear, creating a premium feel." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDuj2avGetkExVWy0bFE3d3gOFGPraqouB9RMwtqNsb50CBTpcEoLuZZgKfR4tpMa_Y4R5iviCSVWhpJslbarM8RETzggwZ1t8rbcO9KdYzwr29pUznmT3Lza1nDYGCtS4im-nCzBNXNpJSz9hdd1niC7utlooP8DfeBuSIRdL7wXdWgaQR6CiPZ1ZbxrQ04h9wN8j1TLylM3H7GNEQcEOD_om5e-Dwf3ukGxb4JW4yEhJ7b8uvY59eXLhGjJ8MwkzRaV4apoI5pHs')"></div>
           </div>
-          <span class="text-label-sm font-label-sm uppercase tracking-wider text-center group-hover:text-primary-container transition-colors">Áo Thun Nữ</span>
+          <span class="text-label-sm font-label-sm uppercase tracking-wider text-center group-hover:text-primary-container transition-colors">Áo Thun Nam</span>
         </a>
         <!-- Category Item 2 -->
         <a class="flex flex-col items-center gap-4 min-w-[100px] snap-center group" href="#">
@@ -132,23 +132,23 @@ onMounted(() => {
         <!-- Category Item 3 -->
         <a class="flex flex-col items-center gap-4 min-w-[100px] snap-center group" href="#">
           <div class="w-[100px] h-[100px] md:w-[140px] md:h-[140px] rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary-container transition-colors p-1">
-            <div class="w-full h-full rounded-full bg-cover bg-center group-hover:scale-110 transition-transform duration-500" data-alt="An elegant presentation of women's sun protection outerwear. Shot in a bright, modern studio setting with soft natural light filtering through. The garment is draped beautifully to highlight its functional yet stylish design." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCarTSRbX2o-s6e8UxaMHazBrXmtUdg8KOgN3d_gDKZzZTyY3c3XLZ0tjJgMlKGTAuCo5fX-YaC8lapddGOhZ6LHQZSP1loFRc_w5PqWNAD1Fo6JsWDpFozWbkJVgbLrEncqpDB4v4zr_yzPASYlWbqOhnzXTMm6R51Z8tDiwb66uRW-fyYRU5NgXclGmPA23PG1f3_DaIaaPFeo5RWamaTORQbCCXrERStRerg2M1ufxi-DdI-PH4PP9VKpLWP5HgomPNk2ACFFt8')"></div>
+            <div class="w-full h-full rounded-full bg-cover bg-center group-hover:scale-110 transition-transform duration-500" data-alt="An elegant presentation of women's sun protection outerwear. Shot in a bright, modern studio setting with soft natural light filtering through. The garment is draped beautifully to highlight its functional yet stylish design." style="background-image: url('https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m62fkd8bcuuua3')"></div>
           </div>
-          <span class="text-label-sm font-label-sm uppercase tracking-wider text-center group-hover:text-primary-container transition-colors">Áo Chống Nắng</span>
+          <span class="text-label-sm font-label-sm uppercase tracking-wider text-center group-hover:text-primary-container transition-colors">Áo Cộc Nam</span>
         </a>
         <!-- Category Item 4 -->
         <a class="flex flex-col items-center gap-4 min-w-[100px] snap-center group" href="#">
           <div class="w-[100px] h-[100px] md:w-[140px] md:h-[140px] rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary-container transition-colors p-1">
-            <div class="w-full h-full rounded-full bg-cover bg-center group-hover:scale-110 transition-transform duration-500" data-alt="A clean, minimalist photo of a stylish pair of shorts. Soft studio lighting against a pristine white backdrop. The composition is simple, emphasizing the sharp lines and summer-ready aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDPP0owJ7qF1qksrL64DVLMpNKneXNljuHymJ7xr-vy8EDqvNnNGtLuKh6idmja3FyFoP2bMBa6Vdo0HvCAG3TYVFveglM_GVN-4PvaRRVlRN1G86ZxkOyYk5PDmApR5vqGF9tjpK3fFv07DpUSDEuIK_2LcIsy1YAMlHSPU8H2dctMPGvpoR50Tu2QJu9r57mS3WUHve9k9rBKiTBV7svyNYhNrmsy50lw93JW-yBmvkqJIJuQ_y5z7q9yAspsRWVWzQ2KHFT73RA')"></div>
+            <div class="w-full h-full rounded-full bg-cover bg-center group-hover:scale-110 transition-transform duration-500" data-alt="A clean, minimalist photo of a stylish pair of shorts. Soft studio lighting against a pristine white backdrop. The composition is simple, emphasizing the sharp lines and summer-ready aesthetic." style="background-image: url('https://th.bing.com/th/id/R.3f7fbc266959a8c2bb4c056073555957?rik=J9W2JChdgY%2frqA&pid=ImgRaw&r=0')"></div>
           </div>
-          <span class="text-label-sm font-label-sm uppercase tracking-wider text-center group-hover:text-primary-container transition-colors">Quần Short</span>
+          <span class="text-label-sm font-label-sm uppercase tracking-wider text-center group-hover:text-primary-container transition-colors">ÁO Lỡ Tay Nam</span>
         </a>
         <!-- Category Item 5 -->
         <a class="flex flex-col items-center gap-4 min-w-[100px] snap-center group" href="#">
           <div class="w-[100px] h-[100px] md:w-[140px] md:h-[140px] rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary-container transition-colors p-1">
-            <div class="w-full h-full rounded-full bg-cover bg-center group-hover:scale-110 transition-transform duration-500" data-alt="A dynamic, high-quality image of fashionable activewear for women. The lighting is crisp and energetic, set in a modern gym or clean studio. The focus is on the sleek fabric and active lifestyle aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAZVjZKJwhjCN2FwVUvdel5oJ1G4mj0o-fx7s3a5x-mul6Fk402xrtM65LE9gI5Jeqf9O9PVhXWHK6UgqRFzTAtY_I61lsC1SxHcysyIhBTpacBQIfRt2jqvSG5wdez__x-fzHvub--nF9XxgoHR8IkMKJTFvyan4WIAiF3Kpi-M9KoJT1ZdzfvFEDG4oprsUuF3vbBF291i1EA39Q608MDz2Wqo4z1DANAIkQn8gFPGmTiuCYv86EgcmM8o4v639tJhuaksl5c31k')"></div>
+            <div class="w-full h-full rounded-full bg-cover bg-center group-hover:scale-110 transition-transform duration-500" data-alt="A dynamic, high-quality image of fashionable activewear for women. The lighting is crisp and energetic, set in a modern gym or clean studio. The focus is on the sleek fabric and active lifestyle aesthetic." style="background-image: url('https://tse3.mm.bing.net/th/id/OIP.-crYBkwtTGXY98tuY3jhHwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3')"></div>
           </div>
-          <span class="text-label-sm font-label-sm uppercase tracking-wider text-center group-hover:text-primary-container transition-colors">Đồ Thể Thao</span>
+          <span class="text-label-sm font-label-sm uppercase tracking-wider text-center group-hover:text-primary-container transition-colors">Áo Thể Thao Nam</span>
         </a>
         <!-- Category Item 6 -->
         <RouterLink to="/all-products" class="flex flex-col items-center gap-4 min-w-[100px] snap-center group">
