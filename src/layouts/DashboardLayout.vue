@@ -54,7 +54,11 @@ const handleNotificationClick = async (notif) => {
   try {
     await api.put(`/api/v1/thong-bao/${notif.id}/da-doc`)
     await fetchNotifications()
-    router.push(`/invoices/${notif.idHoaDon}`)
+    if (notif.idHoaDon) {
+      router.push(`/invoices/${notif.idHoaDon}`)
+    } else {
+      router.push('/admin/chat')
+    }
     closeNotificationsPanel()
   } catch (error) {
     console.error('Error marking notification as read:', error)
@@ -583,16 +587,16 @@ const getImageUrl = (url) => {
 
         <!-- Quản lý Chat -->
         <li>
-          <a
+          <RouterLink
+            to="/admin/chat"
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
-            class="flex items-center justify-between py-3 text-surface-variant/80 hover:bg-surface-variant/10 hover:text-surface-bright rounded-lg transition-colors group cursor-pointer"
-            href="#"
+            class="flex items-center gap-3 py-3 rounded-lg font-bold transition-all shadow-sm"
+            :style="isActiveRoute('/admin/chat') ? 'background-image: linear-gradient(to right, #FFB74D, #EF972D); color: #ffffff;' : 'color: rgba(211, 228, 254, 0.8);'"
+            :class-active="isActiveRoute('/admin/chat') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
           >
-            <div :class="!sidebarExpanded && 'justify-center w-full'" class="flex items-center gap-3">
-              <span class="material-symbols-outlined group-hover:scale-110 transition-transform">chat</span>
-              <span class="font-body-md text-body-md whitespace-nowrap" v-show="sidebarExpanded">Quản lý Chat</span>
-            </div>
-          </a>
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">chat</span>
+            <span class="font-body-md text-body-md font-semibold whitespace-nowrap" v-show="sidebarExpanded">Quản lý Chat</span>
+          </RouterLink>
         </li>
       </ul>
 

@@ -32,6 +32,7 @@ import LichSuHoatDongView from '../views/main/LichSuHoatDongView.vue'
 import LichLamViecCuaToiView from '../views/main/LichLamViecCuaToiView.vue'
 import GiaoCaView from '../views/main/GiaoCaView.vue'
 import KeToanView from '../views/main/KeToanView.vue'
+import ChatManagementView from '../views/main/ChatManagementView.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
@@ -279,6 +280,12 @@ const router = createRouter({
       path: '/admin/ke-toan',
       name: 'admin-ke-toan',
       component: KeToanView,
+      meta: { layout: 'DashboardLayout' },
+    },
+    {
+      path: '/admin/chat',
+      name: 'admin-chat',
+      component: ChatManagementView,
       meta: { layout: 'DashboardLayout' },
     },
   ],
