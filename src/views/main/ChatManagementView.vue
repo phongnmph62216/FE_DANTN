@@ -53,7 +53,7 @@ const statusColor = (status) => {
 const fetchSessions = async () => {
   try {
     const res = await api.get('/api/v1/chat/sessions')
-    sessions.value = res.data?.data || []
+    sessions.value = res.data || []
   } catch (e) {
     console.error('Error fetching sessions:', e)
   }
@@ -63,7 +63,7 @@ const fetchSessions = async () => {
 const fetchMessages = async (sessionCode) => {
   try {
     const res = await api.get(`/api/v1/chat/sessions/${sessionCode}/messages`)
-    messages.value = res.data?.data || []
+    messages.value = res.data || []
     scrollToBottom()
   } catch (e) {
     console.error('Error fetching messages:', e)

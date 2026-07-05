@@ -32,10 +32,10 @@ const showNotificationsPanel = ref(false)
 const fetchNotifications = async () => {
   try {
     const resCount = await api.get('/api/v1/thong-bao/chua-doc/count')
-    unreadCount.value = resCount.data?.data || 0
+    unreadCount.value = typeof resCount.data === 'number' ? resCount.data : 0
 
     const resList = await api.get('/api/v1/thong-bao')
-    notifications.value = resList.data?.data || []
+    notifications.value = resList.data || []
   } catch (error) {
     console.error('Error fetching notifications:', error)
   }
