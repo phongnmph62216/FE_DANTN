@@ -3,6 +3,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, RouterLink, useRouter } from 'vue-router'
 import api from '../../services/api'
 
+import { formatCurrency } from '@/utils/format'
+
 const route = useRoute()
 const router = useRouter()
 const productId = route.params.id
@@ -15,12 +17,6 @@ const selectedSize = ref('')
 const quantity = ref(1)
 const mainImage = ref('')
 const isLoading = ref(true)
-
-// Helper formatting
-const formatCurrency = (val) => {
-  if (val === undefined || val === null) return '0 đ'
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
-}
 
 // Helper to clean database mangled string question marks
 const sanitizeVietnamese = (text) => {

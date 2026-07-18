@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../services/api'
+import { formatCurrency } from '@/utils/format'
 
 // Loading & List States
 const products = ref([])
@@ -20,12 +21,6 @@ const minPrice = ref('')
 const maxPrice = ref('')
 const searchQuery = ref('')
 const sortBy = ref('Mới nhất')
-
-// Formatting helper
-const formatCurrency = (val) => {
-  if (val === undefined || val === null) return '0 đ'
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
-}
 
 // Helper to clean database mangled string question marks
 const sanitizeVietnamese = (text) => {

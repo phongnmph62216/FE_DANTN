@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Html5Qrcode } from 'html5-qrcode'
 import api from '../../services/api'
+import { formatCurrency as formatPrice, formatInputNumber, parseInputNumber } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,10 +79,6 @@ const sanitizeVietnamese = (text) => {
   cleaned = cleaned.replace(/Ki\?u/g, 'Kiểu')
   cleaned = cleaned.replace(/Huy\?n/g, 'Huyền')
   return cleaned
-}
-
-const formatPrice = (amount) => {
-  return `${new Intl.NumberFormat('vi-VN').format(amount)} đ`
 }
 
 const isDiscountActive = (v) => {
@@ -1040,19 +1037,21 @@ onMounted(() => {
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Giá bán (đ) *</label>
                 <input
-                  type="number"
-                  min="0"
-                  v-model.number="editForm.salePrice"
+                  type="text"
+                  :value="formatInputNumber(editForm.salePrice)"
+                  @input="editForm.salePrice = parseInputNumber($event.target.value)"
                   class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-sm font-semibold"
+                  placeholder="0"
                 />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Giá nhập (đ) *</label>
                 <input
-                  type="number"
-                  min="0"
-                  v-model.number="editForm.importPrice"
+                  type="text"
+                  :value="formatInputNumber(editForm.importPrice)"
+                  @input="editForm.importPrice = parseInputNumber($event.target.value)"
                   class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-sm"
+                  placeholder="0"
                 />
               </div>
             </div>

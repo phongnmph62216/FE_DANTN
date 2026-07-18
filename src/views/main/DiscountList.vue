@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../services/api'
+import { formatDate, sortNewestAtTop } from '@/utils/format'
 
 const router = useRouter()
 
@@ -47,21 +48,6 @@ const currentPage = ref(0)
 const totalPages = ref(1)
 const totalElements = ref(0)
 const pageSize = ref(10)
-
-// Helper to format dates
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  try {
-    const d = new Date(dateString)
-    if (isNaN(d.getTime())) return dateString
-    const day = String(d.getDate()).padStart(2, '0')
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const year = d.getFullYear()
-    return `${day}/${month}/${year}`
-  } catch (e) {
-    return dateString
-  }
-}
 
 // Get dynamic display status details
 const getStatusBadge = (item) => {
@@ -156,7 +142,7 @@ const fetchSales = async (page = 0) => {
         })
       }
 
-      sales.value = content
+      sales.value = sortNewestAtTop('discount', content)
       totalPages.value = data.totalPages || 1
       totalElements.value = data.totalElements || 0
     }

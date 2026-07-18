@@ -33,30 +33,6 @@ const showToast = (message, type = 'success') => {
 }
 
 // Helpers
-const formatPrice = (price) => {
-  if (price === null || price === undefined) return '0đ'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-    .format(price)
-    .replace(/\s?₫/, 'đ')
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  try {
-    const d = new Date(dateString)
-    if (isNaN(d.getTime())) return dateString
-    
-    const day = String(d.getDate()).padStart(2, '0')
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const year = d.getFullYear()
-    const hours = String(d.getHours()).padStart(2, '0')
-    const minutes = String(d.getMinutes()).padStart(2, '0')
-    
-    return `${day}/${month}/${year} ${hours}:${minutes}`
-  } catch (e) {
-    return dateString
-  }
-}
 
 const getStatusBadgeClass = (status) => {
   const code = parseInt(status, 10)
@@ -132,7 +108,7 @@ const fetchInvoices = async (page = 0) => {
     const data = res.data
 
     if (data) {
-      invoices.value = data.content || []
+      invoices.value = (data.content || []).sort((a, b) => b.id - a.id)
       totalPages.value = data.totalPages || 1
       totalElements.value = data.totalElements || 0
     } else {
@@ -455,10 +431,10 @@ onMounted(() => {
                 {{ item.tenKhachHang || item.khachHang || 'Khách lẻ' }}
               </td>
               <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface-variant">
-                {{ formatDate(item.ngayTao) }}
+                {{ $format.dateTime(item.ngayTao) }}
               </td>
               <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface font-semibold">
-                {{ formatPrice(item.tongTien) }}
+                {{ $format.currency(item.tongTien) }}
               </td>
               <td class="py-3.5 px-4">
                 <span

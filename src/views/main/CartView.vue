@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import { formatCurrency } from '@/utils/format'
 
 const cartItems = ref([])
 
@@ -48,11 +49,6 @@ const totalQuantity = computed(() => {
 const shippingTarget = 399000
 const shippingRemains = computed(() => Math.max(0, shippingTarget - totalPrice.value))
 const freeShippingQualified = computed(() => totalPrice.value >= shippingTarget)
-
-// Helper formatting
-const formatCurrency = (val) => {
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
-}
 
 onMounted(() => {
   loadCart()

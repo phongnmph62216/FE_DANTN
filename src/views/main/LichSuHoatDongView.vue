@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import api from '@/services/api'
+import { formatCurrency as utilsFormatCurrency } from '@/utils/format'
 
 // Toast notification alert state
 const toast = ref({ show: false, message: '', type: 'success' })
@@ -135,14 +136,13 @@ const closeDetailsModal = () => {
 
 // Formatters
 const formatCurrency = (val) => {
-  if (val === null || val === undefined) return '0 đ'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)
+  return utilsFormatCurrency(val)
 }
 
 const formatDiff = (val) => {
   if (val === null || val === undefined) return '0 đ'
   const prefix = val > 0 ? '+' : ''
-  return prefix + new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)
+  return prefix + utilsFormatCurrency(val)
 }
 
 const formatDateTime = (dateTimeStr) => {

@@ -337,7 +337,7 @@ const fetchItems = async () => {
       throw new Error('Phản hồi API không đúng định dạng phân trang (thiếu content).')
     }
 
-    items.value = pageData.content.map(mapFromBackend)
+    items.value = pageData.content.map(mapFromBackend).sort((a, b) => b.id - a.id)
     totalPages.value = pageData.totalPages ?? 1
     totalElements.value = pageData.totalElements ?? pageData.content.length
   } catch (error) {

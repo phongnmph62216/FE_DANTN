@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../services/api'
+import { formatInputNumber, parseInputNumber, trackNewItem } from '@/utils/format'
 
 const router = useRouter()
 
@@ -547,6 +548,9 @@ const handleSave = async () => {
         if (res._wrapper && res._wrapper.status && res._wrapper.status.includes('ERROR')) {
           showToast(`Lưu sản phẩm thất bại: ${res._wrapper.message || 'Lỗi hệ thống'}`, 'error')
         } else {
+          if (res.data && res.data.id) {
+            trackNewItem('product', res.data.id)
+          }
           showToast('Lưu sản phẩm mới thành công!', 'success')
           setTimeout(() => {
             router.push('/products')
@@ -983,20 +987,22 @@ onUnmounted(() => {
               
               <div class="col-span-3 relative">
                 <input
-                  v-model.number="v.salePrice"
+                  :value="formatInputNumber(v.salePrice)"
+                  @input="v.salePrice = parseInputNumber($event.target.value)"
                   class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm pr-8 focus:ring-1 focus:ring-[#ef972d] focus:border-[#ef972d] outline-none"
-                  type="number"
-                  min="0"
+                  type="text"
+                  placeholder="0"
                 />
                 <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">đ</span>
               </div>
 
               <div class="col-span-3 relative">
                 <input
-                  v-model.number="v.importPrice"
+                  :value="formatInputNumber(v.importPrice)"
+                  @input="v.importPrice = parseInputNumber($event.target.value)"
                   class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm pr-8 focus:ring-1 focus:ring-[#ef972d] focus:border-[#ef972d] outline-none"
-                  type="number"
-                  min="0"
+                  type="text"
+                  placeholder="0"
                 />
                 <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">đ</span>
               </div>
@@ -1048,10 +1054,11 @@ onUnmounted(() => {
             <label class="text-sm font-semibold text-gray-700">Giá bán mặc định (VNĐ)</label>
             <div class="relative">
               <input
-                v-model.number="bulkSalePrice"
+                :value="formatInputNumber(bulkSalePrice)"
+                @input="bulkSalePrice = parseInputNumber($event.target.value)"
                 class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-sm pr-8"
-                type="number"
-                min="0"
+                type="text"
+                placeholder="0"
               />
               <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">đ</span>
             </div>
@@ -1061,10 +1068,11 @@ onUnmounted(() => {
             <label class="text-sm font-semibold text-gray-700">Giá nhập mặc định (VNĐ)</label>
             <div class="relative">
               <input
-                v-model.number="bulkImportPrice"
+                :value="formatInputNumber(bulkImportPrice)"
+                @input="bulkImportPrice = parseInputNumber($event.target.value)"
                 class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-sm pr-8"
-                type="number"
-                min="0"
+                type="text"
+                placeholder="0"
               />
               <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">đ</span>
             </div>

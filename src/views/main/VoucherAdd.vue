@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '../../services/api'
+import { formatCurrency as formatPrice, formatDate, formatInputNumber, parseInputNumber, trackNewItem } from '@/utils/format'
 
 const router = useRouter()
 const route = useRoute()
@@ -40,26 +41,8 @@ const showToast = (message, type = 'success') => {
   }, 4000)
 }
 
-// Format currency helper
-const formatPrice = (price) => {
-  if (price === null || price === undefined) return '0 đ'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-    .format(price)
-    .replace(/\s?₫/, ' đ')
-}
-
 const formatBirthDate = (dateString) => {
-  if (!dateString) return '-'
-  try {
-    const d = new Date(dateString)
-    if (isNaN(d.getTime())) return dateString
-    const day = String(d.getDate()).padStart(2, '0')
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const year = d.getFullYear()
-    return `${day}/${month}/${year}`
-  } catch (e) {
-    return '-'
-  }
+  return formatDate(dateString) || '-'
 }
 
 // Fetch customers
@@ -263,6 +246,9 @@ const executeSave = async () => {
       const actionName = isEdit.value ? 'Cập nhật' : 'Tạo'
       showToast(`${actionName} phiếu giảm giá thất bại: ${res._wrapper.message}`, 'error')
     } else {
+      if (!isEdit.value && res.data && res.data.id) {
+        trackNewItem('voucher', res.data.id)
+      }
       const successMsg = isEdit.value ? 'Đã cập nhật phiếu giảm giá thành công!' : 'Đã thêm phiếu giảm giá thành công!'
       showToast(successMsg, 'success')
       setTimeout(() => {
@@ -411,6 +397,15 @@ onMounted(async () => {
               </label>
               <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center">
                 <input
+                  v-if="loaiGiam === 1"
+                  :value="formatInputNumber(giaTriGiam)"
+                  @input="giaTriGiam = parseInputNumber($event.target.value)"
+                  class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
+                  placeholder="Nhập giá trị giảm"
+                  type="text"
+                />
+                <input
+                  v-else
                   v-model="giaTriGiam"
                   class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
                   placeholder="Nhập giá trị giảm"
@@ -431,12 +426,11 @@ onMounted(async () => {
               </label>
               <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center">
                 <input
-                  v-model="donToiThieu"
+                  :value="formatInputNumber(donToiThieu)"
+                  @input="donToiThieu = parseInputNumber($event.target.value)"
                   class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
                   placeholder="Nhập giá trị đơn hàng tối thiểu"
-                  type="number"
-                  min="0"
-                  step="any"
+                  type="text"
                 />
                 <span class="px-3 py-2 font-body-md text-gray-500 border-l border-gray-200 bg-gray-50 rounded-r-md min-w-[44px] text-center font-medium">
                   đ
@@ -512,13 +506,12 @@ onMounted(async () => {
               </label>
               <div class="relative rounded-md shadow-sm border flex items-center bg-white" :class="loaiGiam === 1 ? 'border-gray-200 bg-gray-50/50' : 'border-gray-300'">
                 <input
-                  v-model="giamToiDa"
+                  :value="formatInputNumber(giamToiDa)"
+                  @input="giamToiDa = parseInputNumber($event.target.value)"
                   :disabled="loaiGiam === 1"
                   class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent disabled:text-gray-400 disabled:cursor-not-allowed"
                   placeholder="Nhập giá trị giảm tối đa"
-                  type="number"
-                  min="0"
-                  step="any"
+                  type="text"
                 />
                 <span class="px-3 py-2 font-body-md border-l rounded-r-md min-w-[44px] text-center font-medium" :class="loaiGiam === 1 ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-500'">
                   đ

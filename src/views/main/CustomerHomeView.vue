@@ -3,13 +3,10 @@ import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../services/api'
 
+import { formatCurrency } from '@/utils/format'
+
 const products = ref([])
 const isLoading = ref(false)
-
-const formatCurrency = (val) => {
-  if (val === undefined || val === null) return '0 đ'
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
-}
 
 const sanitizeVietnamese = (text) => {
   if (!text) return ''

@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { Line } from '@antv/g2plot'
 import api from '@/services/api'
+import { formatCurrency } from '@/utils/format'
 
 // Loading states
 const loadingOverview = ref(false)
@@ -56,10 +57,6 @@ const chartContainer = ref(null)
 let chartInstance = null
 
 // Formatter utilities
-const formatCurrency = (value) => {
-  if (value === undefined || value === null) return '0 đ'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)
-}
 
 const formatNumber = (value) => {
   if (value === undefined || value === null) return '0'

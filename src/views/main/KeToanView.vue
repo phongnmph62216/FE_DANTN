@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { formatCurrency, formatDate } from '@/utils/format'
 
 const authStore = useAuthStore()
 
@@ -90,15 +91,10 @@ const filteredLogs = computed(() => {
 })
 
 // Formatters
-const formatCurrency = (val) => {
-  if (val === null || val === undefined) return '0 đ'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)
-}
-
 const formatDiff = (val) => {
   if (val === null || val === undefined) return '0 đ'
   const prefix = val > 0 ? '+' : ''
-  return prefix + new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)
+  return prefix + formatCurrency(val)
 }
 
 const formatDateTime = (dateTimeStr) => {
@@ -107,7 +103,7 @@ const formatDateTime = (dateTimeStr) => {
   if (isNaN(date.getTime())) return { time: dateTimeStr, day: '' }
   const pad = (n) => String(n).padStart(2, '0')
   const time = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-  const day = `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`
+  const day = formatDate(dateTimeStr)
   return { time, day }
 }
 

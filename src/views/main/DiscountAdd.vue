@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { trackNewItem } from '@/utils/format'
 import api from '../../services/api'
 
 const route = useRoute()
@@ -45,12 +46,15 @@ const handleConfirm = async () => {
 }
 
 // Helper to format date string to yyyy-MM-dd
-const formatToInputDate = (dateStr) => {
+const formatToInputDateTime = (dateStr) => {
   if (!dateStr) return ''
+  // datetime-local expects YYYY-MM-DDTHH:mm format
   if (dateStr.includes('T')) {
-    return dateStr.split('T')[0]
+    // e.g. "2026-07-18T14:30:00" -> "2026-07-18T14:30"
+    return dateStr.substring(0, 16)
   }
-  return dateStr.substring(0, 10)
+  // If only date string, default to 00:00
+  return `${dateStr.substring(0, 10)}T00:00`
 }
 
 const loadDiscountDetails = async () => {
@@ -61,8 +65,8 @@ const loadDiscountDetails = async () => {
     if (data) {
       discountName.value = data.tenDotGiamGia || ''
       discountPercent.value = data.phanTramGiam || null
-      startDate.value = formatToInputDate(data.ngayBatDau)
-      endDate.value = formatToInputDate(data.ngayKetThuc)
+      startDate.value = formatToInputDateTime(data.ngayBatDau)
+      endDate.value = formatToInputDateTime(data.ngayKetThuc)
       selectedVariantIds.value = data.danhSachIdChiTietSanPham || []
       trangThai.value = data.trangThai ?? 1
     }
@@ -399,8 +403,8 @@ const saveDiscount = () => {
         const payload = {
           tenDotGiamGia: discountName.value.trim(),
           phanTramGiam: discountPercent.value,
-          ngayBatDau: `${startDate.value}T00:00:00`,
-          ngayKetThuc: `${endDate.value}T23:59:59`,
+          ngayBatDau: startDate.value.length === 16 ? `${startDate.value}:00` : startDate.value,
+          ngayKetThuc: endDate.value.length === 16 ? `${endDate.value}:00` : endDate.value,
           danhSachIdChiTietSanPham: selectedVariantIds.value,
           trangThai: trangThai.value
         }
@@ -415,6 +419,9 @@ const saveDiscount = () => {
         if (res._wrapper && res._wrapper.status && res._wrapper.status.includes('ERROR')) {
           showToast(`${isEditMode.value ? 'Cập nhật' : 'Thêm'} đợt giảm giá thất bại: ${res._wrapper.message}`, 'error')
         } else {
+          if (!isEditMode.value && res.data && res.data.id) {
+            trackNewItem('discount', res.data.id)
+          }
           showToast(`${isEditMode.value ? 'Cập nhật' : 'Tạo mới'} đợt giảm giá thành công!`, 'success')
           setTimeout(() => {
             router.push('/discounts')
@@ -482,10 +489,8 @@ onMounted(async () => {
                 <input
                   v-model="startDate"
                   class="w-full border border-gray-300 rounded-md px-3 py-2 font-body-md text-body-md focus:outline-none focus:ring-1 form-input-ring text-on-surface bg-white"
-                  type="date"
-                  placeholder="dd/mm/yyyy"
+                  type="datetime-local"
                 />
-                <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">calendar_today</span>
               </div>
             </div>
             
@@ -496,10 +501,8 @@ onMounted(async () => {
                 <input
                   v-model="endDate"
                   class="w-full border border-gray-300 rounded-md px-3 py-2 font-body-md text-body-md focus:outline-none focus:ring-1 form-input-ring text-on-surface bg-white"
-                  type="date"
-                  placeholder="dd/mm/yyyy"
+                  type="datetime-local"
                 />
-                <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">calendar_today</span>
               </div>
             </div>
 
@@ -639,7 +642,7 @@ onMounted(async () => {
         <!-- Price Slider -->
         <div class="pt-2">
           <div class="font-body-md text-body-md text-on-surface mb-2">
-            Khoảng giá: 0 đ - {{ new Intl.NumberFormat('vi-VN').format(priceRangeValue) }} đ
+            Khoảng giá: 0 đ - {{ $format.currency(priceRangeValue) }}
           </div>
           <div class="relative w-full h-4 flex items-center">
             <input
@@ -720,15 +723,15 @@ onMounted(async () => {
               <td class="py-3 px-2 text-right" @click="toggleVariantSelection(v.id)">
                 <template v-if="discountPercent && discountPercent > 0 && discountPercent <= 100">
                   <span style="text-decoration: line-through; color: #9ca3af; font-size: 12px; display: block; font-weight: normal; margin-bottom: 2px; text-align: right;">
-                    {{ new Intl.NumberFormat('vi-VN').format(v.salePrice) }} đ
+                    {{ $format.currency(v.salePrice) }}
                   </span>
                   <span style="color: #ef4444; font-weight: bold; font-size: 14px; display: block; text-align: right;">
-                    {{ new Intl.NumberFormat('vi-VN').format(Math.round(v.salePrice * (1 - discountPercent / 100))) }} đ
+                    {{ $format.currency(Math.round(v.salePrice * (1 - discountPercent / 100))) }}
                   </span>
                 </template>
                 <template v-else>
                   <span class="text-[#0b1c30] font-semibold text-body-md block" style="text-align: right;">
-                    {{ new Intl.NumberFormat('vi-VN').format(v.salePrice) }} đ
+                    {{ $format.currency(v.salePrice) }}
                   </span>
                 </template>
               </td>
@@ -823,7 +826,8 @@ onMounted(async () => {
   -webkit-appearance: none;
   background-image: none;
 }
-.date-input-container input[type="date"]::-webkit-calendar-picker-indicator {
+.date-input-container input[type="date"]::-webkit-calendar-picker-indicator,
+.date-input-container input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   position: absolute;
   top: 0;
   left: 0;

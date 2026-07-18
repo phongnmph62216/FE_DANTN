@@ -3,6 +3,8 @@ import { ref, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '@/services/api'
 
+import { formatCurrency } from '@/utils/format'
+
 const route = useRoute()
 
 const isLoading = ref(true)
@@ -31,10 +33,6 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
-
-const formatCurrency = (val) => {
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
-}
 </script>
 
 <template>

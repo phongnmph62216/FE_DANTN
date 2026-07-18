@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { formatCurrency, formatInputNumber, parseInputNumber } from '@/utils/format'
 
 const props = defineProps({
   show: {
@@ -31,13 +32,6 @@ const selectedTab = ref('TIEN_MAT') // 'TIEN_MAT' or 'CHUYEN_KHOAN'
 // DOM Elements
 const cashInputRef = ref(null)
 const transferInputRef = ref(null)
-
-// Format utilities
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-    .format(value || 0)
-    .replace(/\s?₫/, ' đ')
-}
 
 // Calculations
 const tongDaNhap = computed(() => {
@@ -223,13 +217,12 @@ onMounted(() => {
             </div>
             <div class="relative">
               <input 
-                type="number"
+                type="text"
                 ref="cashInputRef"
-                :value="tienMat"
-                @input="handleCashChange($event.target.value)"
+                :value="formatInputNumber(tienMat)"
+                @input="handleCashChange(parseInputNumber($event.target.value))"
                 :class="selectedTab === 'TIEN_MAT' ? 'border-[#EF972D] ring-2 ring-[#EF972D]/10 bg-white' : 'border-gray-200 bg-gray-50/50'"
                 class="w-full px-4 py-2.5 rounded-xl text-base font-bold text-gray-800 outline-none border transition-all"
-                min="0"
                 placeholder="Nhập tiền mặt"
               />
               <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">đ</span>
@@ -264,13 +257,12 @@ onMounted(() => {
             </div>
             <div class="relative">
               <input 
-                type="number"
+                type="text"
                 ref="transferInputRef"
-                :value="tienChuyenKhoan"
-                @input="handleTransferChange($event.target.value)"
+                :value="formatInputNumber(tienChuyenKhoan)"
+                @input="handleTransferChange(parseInputNumber($event.target.value))"
                 :class="selectedTab === 'CHUYEN_KHOAN' ? 'border-[#EF972D] ring-2 ring-[#EF972D]/10 bg-white' : 'border-gray-200 bg-gray-50/50'"
                 class="w-full px-4 py-2.5 rounded-xl text-base font-bold text-gray-800 outline-none border transition-all"
-                min="0"
                 placeholder="Nhập tiền chuyển khoản"
               />
               <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">đ</span>

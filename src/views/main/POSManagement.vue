@@ -5,6 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import api from '../../services/api'
 import PaymentModal from '../../components/PaymentModal.vue'
 import { useAuthStore } from '@/stores/auth'
+import { formatCurrency, formatDate, formatDateTime, formatTime } from '@/utils/format'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -110,6 +111,10 @@ const productSizes = ref([])
 const productVariants = ref([])
 const isProductLoading = ref(false)
 
+// Quantity picker state for product modal
+const qtyPickerVariantId = ref(null)
+const qtyPickerValue = ref(1)
+
 // ---------------- CUSTOMER SELECTION STATE ----------------
 const showCustomerModal = ref(false)
 const customerSearchQuery = ref('')
@@ -142,12 +147,7 @@ const isGHNCalculated = ref(false)
 const showPaymentModal = ref(false)
 const showCheckoutConfirmModal = ref(false)
 
-// Helper formatting utilities
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-    .format(value || 0)
-    .replace(/\s?₫/, ' đ')
-}
+// Helper formatting utilities (imported from format.js)
 
 const isDiscountActive = (v) => {
   if (!v || !v.phanTramGiam || v.trangThaiDotGiamGia !== 1) return false
@@ -1219,7 +1219,32 @@ const fetchProductModalVariants = async (silent = false) => {
   }
 }
 
-const addVariantToCart = async (variant) => {
+const openQtyPicker = (variant) => {
+  if (!currentOrder.value) {
+    showToast('Vui lòng tạo hoặc chọn một đơn hàng chờ trước!', 'error')
+    return
+  }
+  const available = getAvailableStockForModal(variant)
+  if (available < 1) {
+    showToast('Sản phẩm đã hết hàng hoặc đã được đặt hết trong các đơn hàng chờ!', 'error')
+    return
+  }
+  qtyPickerVariantId.value = variant.id
+  qtyPickerValue.value = 1
+}
+
+const closeQtyPicker = () => {
+  qtyPickerVariantId.value = null
+  qtyPickerValue.value = 1
+}
+
+const confirmAddWithQty = async (variant) => {
+  const qty = qtyPickerValue.value
+  closeQtyPicker()
+  await addVariantToCart(variant, qty)
+}
+
+const addVariantToCart = async (variant, qty = 1) => {
   if (!currentOrder.value) {
     showToast('Vui lòng tạo hoặc chọn một đơn hàng chờ trước!', 'error')
     return
@@ -1229,19 +1254,19 @@ const addVariantToCart = async (variant) => {
   const existing = currentOrder.value.chiTietList.find(i => i.variantId === variant.id)
   if (existing) {
     const maxAllowed = getMaxAllowedQuantity(existing)
-    if (existing.soLuong + 1 > maxAllowed) {
+    if (existing.soLuong + qty > maxAllowed) {
       showToast(`Không thể thêm! Số lượng trong giỏ hàng đã đạt giới hạn tồn kho khả dụng (${maxAllowed}).`, 'error')
       return
     }
-    const msg = `Đã thêm 1 sản phẩm ${variant.tenSanPham} (${variant.color} - ${variant.size}) vào giỏ hàng (Tổng cộng: ${existing.soLuong + 1})!`
-    await changeQuantity(existing, 1, msg)
+    const msg = `Đã thêm ${qty} sản phẩm ${variant.tenSanPham} (${variant.color} - ${variant.size}) vào giỏ hàng (Tổng cộng: ${existing.soLuong + qty})!`
+    await changeQuantity(existing, qty, msg)
     return
   }
 
   // Check available stock
   const available = getAvailableStockForModal(variant)
-  if (available < 1) {
-    showToast('Sản phẩm đã hết hàng hoặc đã được đặt hết trong các đơn hàng chờ!', 'error')
+  if (available < qty) {
+    showToast(`Không đủ tồn kho! Chỉ còn ${available} sản phẩm khả dụng.`, 'error')
     return
   }
 
@@ -1257,8 +1282,8 @@ const addVariantToCart = async (variant) => {
     color: variant.color,
     size: variant.size,
     donGia: effectivePrice,
-    soLuong: 1,
-    thanhTien: effectivePrice,
+    soLuong: qty,
+    thanhTien: effectivePrice * qty,
     image: variant.anh,
     stock: variant.stock,
     isLoading: false
@@ -1270,17 +1295,17 @@ const addVariantToCart = async (variant) => {
 
   // Optimistic update of variant stock in modal list
   if (!isUsingMock.value) {
-    variant.stock = Math.max(0, variant.stock - 1)
+    variant.stock = Math.max(0, variant.stock - qty)
   }
 
-  const successMsg = `Đã thêm 1 sản phẩm ${variant.tenSanPham} (${variant.color} - ${variant.size}) vào giỏ hàng!`
+  const successMsg = `Đã thêm ${qty} sản phẩm ${variant.tenSanPham} (${variant.color} - ${variant.size}) vào giỏ hàng!`
   showToast(successMsg, 'success')
 
   if (!isUsingMock.value) {
     try {
       await api.post(`/api/v1/ban-hang/don-hang/${currentOrder.value.id}/them-san-pham`, {
         idChiTietSanPham: variant.id,
-        soLuong: 1
+        soLuong: qty
       })
       await fetchOrderDetail(currentOrder.value.id)
       await autoApplyBestVoucher(currentOrder.value)
@@ -1294,7 +1319,7 @@ const addVariantToCart = async (variant) => {
       calculatePrices(currentOrder.value)
       // Rollback variant stock in modal list
       if (!isUsingMock.value) {
-        variant.stock = variant.stock + 1
+        variant.stock = variant.stock + qty
       }
     }
   } else {
@@ -2005,7 +2030,7 @@ const printReceiptWindow = (order) => {
       <div class="box">
         <div class="box-title">Thông tin hóa đơn</div>
         <div class="row"><div class="label">Hình thức</div><div class="value">${order.loaiHoaDon === 1 ? 'Giao hàng' : 'Mua tại quầy'}</div></div>
-        <div class="row"><div class="label">Ngày tạo</div><div class="value">${new Date().toLocaleString()}</div></div>
+        <div class="row"><div class="label">Ngày tạo</div><div class="value">${formatDateTime(new Date())}</div></div>
         <div class="row"><div class="label">Người lập</div><div class="value">Nguyễn Hoàng Admin</div></div>
       </div>
     </div>
@@ -2780,14 +2805,53 @@ onUnmounted(async () => {
                 </div>
               </div>
             </div>
-            <button 
-              @click="addVariantToCart(variant)"
-              :disabled="getAvailableStockForModal(variant) === 0"
-              :class="getAvailableStockForModal(variant) === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#ef972d] text-white hover:bg-[#ef972d]/90 cursor-pointer shadow-sm'"
-              class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap"
-            >
-              {{ getAvailableStockForModal(variant) === 0 ? 'Hết hàng' : 'Thêm vào giỏ' }}
-            </button>
+            <!-- Qty Picker / Add Button -->
+            <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+              <!-- Default: Show "Thêm vào giỏ" button -->
+              <button
+                v-if="qtyPickerVariantId !== variant.id"
+                @click="openQtyPicker(variant)"
+                :disabled="getAvailableStockForModal(variant) === 0"
+                :class="getAvailableStockForModal(variant) === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#ef972d] text-white hover:bg-[#ef972d]/90 cursor-pointer shadow-sm'"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap"
+              >
+                {{ getAvailableStockForModal(variant) === 0 ? 'Hết hàng' : 'Thêm vào giỏ' }}
+              </button>
+              <!-- Expanded: Qty Picker -->
+              <div v-else class="flex flex-col items-center gap-1.5">
+                <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-0.5">
+                  <button
+                    @click="qtyPickerValue = Math.max(1, qtyPickerValue - 1)"
+                    class="w-7 h-7 flex items-center justify-center rounded-md bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 cursor-pointer transition-colors text-sm font-bold"
+                  >−</button>
+                  <input
+                    v-model.number="qtyPickerValue"
+                    type="number"
+                    min="1"
+                    :max="getAvailableStockForModal(variant)"
+                    @change="qtyPickerValue = Math.max(1, Math.min(qtyPickerValue || 1, getAvailableStockForModal(variant)))"
+                    class="w-10 h-7 text-center text-sm font-bold border-0 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <button
+                    @click="qtyPickerValue = Math.min(getAvailableStockForModal(variant), qtyPickerValue + 1)"
+                    class="w-7 h-7 flex items-center justify-center rounded-md bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 cursor-pointer transition-colors text-sm font-bold"
+                  >+</button>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button
+                    @click="confirmAddWithQty(variant)"
+                    class="px-2.5 py-1 bg-emerald-500 text-white rounded-md text-[11px] font-semibold hover:bg-emerald-600 cursor-pointer transition-colors shadow-sm flex items-center gap-0.5"
+                  >
+                    <span class="material-symbols-outlined text-[13px]">check</span>
+                    Thêm
+                  </button>
+                  <button
+                    @click="closeQtyPicker()"
+                    class="px-2 py-1 bg-white border border-gray-200 text-gray-500 rounded-md text-[11px] font-semibold hover:bg-gray-50 cursor-pointer transition-colors"
+                  >Hủy</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -3179,7 +3243,7 @@ onUnmounted(async () => {
 
             <div class="mt-2.5 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between flex-wrap gap-2 text-[10px]">
               <span class="text-gray-400">
-                Hạn dùng: {{ new Date(v.ngayKetThuc).toLocaleDateString('vi-VN') }}
+                Hạn dùng: {{ $format.date(v.ngayKetThuc) }}
               </span>
               
               <!-- Indicator status -->

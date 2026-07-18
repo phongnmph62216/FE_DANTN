@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
+import { formatCurrency } from '@/utils/format'
 
 const authStore = useAuthStore()
 
@@ -81,10 +82,6 @@ function formatImage(url) {
   }
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
   return `${apiBase.replace(/\/$/, '')}/${url.replace(/^\//, '')}`
-}
-
-function formatCurrency(val) {
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
 }
 
 const parseMarkdown = (text) => {

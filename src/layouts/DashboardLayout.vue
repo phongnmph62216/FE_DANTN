@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { formatCurrency as utilsFormatCurrency, formatDateTime as utilsFormatDateTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -75,14 +76,7 @@ const markAllAsRead = async () => {
 }
 
 const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit'
-  })
+  return utilsFormatDateTime(dateStr)
 }
 
 const showOpenShiftModal = ref(false)
@@ -92,14 +86,11 @@ const startingCashInput = ref(0)
 const isOpeningShift = ref(false)
 
 const formatCurrency = (val) => {
-  if (val === null || val === undefined) return '0 VNĐ'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val).replace('₫', 'VNĐ')
+  return utilsFormatCurrency(val)
 }
 
 const updateClock = () => {
-  const now = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  currentOpenTime.value = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`
+  currentOpenTime.value = utilsFormatDateTime(new Date())
 }
 
 let clockInterval = null

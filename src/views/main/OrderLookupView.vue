@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
+import { formatCurrency, formatDateTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -122,10 +123,6 @@ const submitCancelRequest = async () => {
   }
 }
 
-const formatCurrency = (val) => {
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
-}
-
 const formatImage = (url) => {
   if (!url) return 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=150'
   if (url.startsWith('data:image/') || url.startsWith('http://') || url.startsWith('https://')) {
@@ -136,16 +133,7 @@ const formatImage = (url) => {
 }
 
 const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
+  return formatDateTime(dateStr)
 }
 
 const getStatusText = (status) => {

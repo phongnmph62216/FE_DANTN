@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../services/api'
+import { sortNewestAtTop } from '@/utils/format'
 
 const router = useRouter()
 
@@ -195,7 +196,7 @@ const fetchEmployees = async (page = 0) => {
     const res = await api.get('/api/v1/nhan-vien', { params })
     const data = res.data
     if (data) {
-      employees.value = data.content || []
+      employees.value = sortNewestAtTop('employee', data.content || [])
       totalPages.value = data.totalPages || 1
       totalElements.value = data.totalElements || 0
       isUsingMock.value = false
@@ -225,7 +226,7 @@ const fetchEmployees = async (page = 0) => {
     totalElements.value = list.length
     totalPages.value = Math.ceil(list.length / pageSize.value) || 1
     const startIdx = page * pageSize.value
-    employees.value = list.slice(startIdx, startIdx + pageSize.value)
+    employees.value = sortNewestAtTop('employee', list.slice(startIdx, startIdx + pageSize.value))
   } finally {
     isLoading.value = false
   }

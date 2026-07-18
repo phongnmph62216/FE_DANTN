@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../services/api'
+import { sortNewestAtTop } from '@/utils/format'
 
 const router = useRouter()
 
@@ -221,7 +222,7 @@ const fetchCustomers = async (page = 0) => {
     const data = res.data
 
     if (data) {
-      customers.value = data.content || []
+      customers.value = sortNewestAtTop('customer', data.content || [])
       totalPages.value = data.totalPages || 1
       totalElements.value = data.totalElements || 0
       isUsingMock.value = false
@@ -256,7 +257,7 @@ const fetchCustomers = async (page = 0) => {
     totalElements.value = filtered.length
     totalPages.value = Math.ceil(filtered.length / pageSize.value) || 1
     const startIdx = page * pageSize.value
-    customers.value = filtered.slice(startIdx, startIdx + pageSize.value)
+    customers.value = sortNewestAtTop('customer', filtered.slice(startIdx, startIdx + pageSize.value))
   } finally {
     isLoading.value = false
   }

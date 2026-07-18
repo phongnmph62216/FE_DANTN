@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Html5Qrcode } from 'html5-qrcode'
 import api from '../../services/api'
+import { formatInputNumber, parseInputNumber, sortNewestAtTop } from '@/utils/format'
 
 const router = useRouter()
 
@@ -153,11 +154,6 @@ const sanitizeVietnamese = (text) => {
   return cleaned
 }
 
-const formatPrice = (val) => {
-  if (val === undefined || val === null) return '0'
-  return new Intl.NumberFormat('vi-VN').format(val)
-}
-
 const formatImage = (url) => {
   if (!url) return 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=150'
   if (url.startsWith('data:image/') || url.startsWith('http://') || url.startsWith('https://')) {
@@ -195,7 +191,7 @@ const fetchProducts = async (page = 0) => {
     const data = res.data
 
     if (data) {
-      products.value = (data.content || []).map(item => ({
+      const mapped = (data.content || []).map(item => ({
         id: item.id,
         code: item.maSanPham || 'N/A',
         name: sanitizeVietnamese(item.tenSanPham || ''),
@@ -210,6 +206,7 @@ const fetchProducts = async (page = 0) => {
         isActive: (item.tongTonKho ?? 0) === 0 ? false : (item.trangThai === 1),
         image: formatImage(item.hinhAnh)
       }))
+      products.value = sortNewestAtTop('product', mapped)
       totalPages.value = data.totalPages || 1
       totalElements.value = data.totalElements || 0
     }
@@ -1104,14 +1101,14 @@ onMounted(() => {
                 <td class="px-6 py-4 text-sm text-right font-medium">
                   <div v-if="product.maxDiscountPercent > 0" class="flex flex-col items-end">
                     <span class="text-xs text-gray-400 line-through font-normal">
-                      {{ product.priceMin === product.priceMax ? `${formatPrice(product.priceMin)}₫` : `${formatPrice(product.priceMin)}₫ - ${formatPrice(product.priceMax)}₫` }}
+                      {{ product.priceMin === product.priceMax ? $format.currency(product.priceMin) : `${$format.currency(product.priceMin)} - ${$format.currency(product.priceMax)}` }}
                     </span>
                     <span class="text-[#ef4444] font-semibold">
-                      {{ product.discountedMin === product.discountedMax ? `${formatPrice(product.discountedMin)}₫` : `${formatPrice(product.discountedMin)}₫ - ${formatPrice(product.discountedMax)}₫` }}
+                      {{ product.discountedMin === product.discountedMax ? $format.currency(product.discountedMin) : `${$format.currency(product.discountedMin)} - ${$format.currency(product.discountedMax)}` }}
                     </span>
                   </div>
                   <span v-else class="text-gray-900">
-                    {{ product.priceMin === product.priceMax ? `${formatPrice(product.priceMin)}₫` : `${formatPrice(product.priceMin)}₫ - ${formatPrice(product.priceMax)}₫` }}
+                    {{ product.priceMin === product.priceMax ? $format.currency(product.priceMin) : `${$format.currency(product.priceMin)} - ${$format.currency(product.priceMax)}` }}
                   </span>
                 </td>
                 <td class="px-6 py-4">
@@ -1425,8 +1422,8 @@ onMounted(() => {
                   <th class="px-4 py-2.5">Màu sắc</th>
                   <th class="px-4 py-2.5">Kích thước</th>
                   <th class="px-4 py-2.5 w-24">Tồn kho</th>
-                  <th class="px-4 py-2.5 w-28">Giá nhập (₫)</th>
-                  <th class="px-4 py-2.5 w-28">Giá bán (₫)</th>
+                  <th class="px-4 py-2.5 w-28">Giá nhập (đ)</th>
+                  <th class="px-4 py-2.5 w-28">Giá bán (đ)</th>
                   <th class="px-4 py-2.5 w-28">Trạng thái</th>
                   <th class="px-4 py-2.5 w-16 text-center">Hành động</th>
                 </tr>
@@ -1454,18 +1451,20 @@ onMounted(() => {
                   </td>
                   <td class="px-4 py-2">
                     <input
-                      type="number"
-                      v-model.number="vItem.giaNhap"
-                      min="0"
+                      type="text"
+                      :value="formatInputNumber(vItem.giaNhap)"
+                      @input="vItem.giaNhap = parseInputNumber($event.target.value)"
                       class="w-full px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-[#ef972d]/30 focus:border-[#ef972d] outline-none text-xs font-semibold text-gray-700"
+                      placeholder="0"
                     />
                   </td>
                   <td class="px-4 py-2">
                     <input
-                      type="number"
-                      v-model.number="vItem.giaBan"
-                      min="0"
+                      type="text"
+                      :value="formatInputNumber(vItem.giaBan)"
+                      @input="vItem.giaBan = parseInputNumber($event.target.value)"
                       class="w-full px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-[#ef972d]/30 focus:border-[#ef972d] outline-none text-xs font-bold text-[#ef972d]"
+                      placeholder="0"
                     />
                   </td>
                   <td class="px-4 py-2">
@@ -1532,22 +1531,24 @@ onMounted(() => {
               </div>
 
               <div>
-                <label class="block text-[10px] font-bold text-gray-500 mb-1">Giá nhập * (₫)</label>
+                <label class="block text-[10px] font-bold text-gray-500 mb-1">Giá nhập * (đ)</label>
                 <input
-                  type="number"
-                  v-model.number="newVariantForm.giaNhap"
-                  min="0"
+                  type="text"
+                  :value="formatInputNumber(newVariantForm.giaNhap)"
+                  @input="newVariantForm.giaNhap = parseInputNumber($event.target.value)"
                   class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-xs"
+                  placeholder="0"
                 />
               </div>
 
               <div>
-                <label class="block text-[10px] font-bold text-gray-500 mb-1">Giá bán * (₫)</label>
+                <label class="block text-[10px] font-bold text-gray-500 mb-1">Giá bán * (đ)</label>
                 <input
-                  type="number"
-                  v-model.number="newVariantForm.giaBan"
-                  min="0"
+                  type="text"
+                  :value="formatInputNumber(newVariantForm.giaBan)"
+                  @input="newVariantForm.giaBan = parseInputNumber($event.target.value)"
                   class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-xs font-bold text-[#ef972d]"
+                  placeholder="0"
                 />
               </div>
 

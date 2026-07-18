@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { formatCurrency as utilsFormatCurrency } from '@/utils/format'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -227,7 +228,7 @@ const shippingFee = computed(() => {
 const totalPayment = computed(() => Math.max(0, subtotal.value + shippingFee.value - discountAmount.value))
 
 const formatCurrency = (val) => {
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
+  return utilsFormatCurrency(val)
 }
 
 // Apply Voucher
@@ -996,7 +997,7 @@ onMounted(async () => {
               </div>
               <div class="flex justify-between items-center text-[11px] text-slate-400 mt-1">
                 <span>Số lượng còn lại: {{ v.soLuong - (v.soLuongDaDung || 0) }}</span>
-                <span>Hạn dùng: {{ new Date(v.ngayKetThuc).toLocaleDateString('vi-VN') }}</span>
+                <span>Hạn dùng: {{ $format.date(v.ngayKetThuc) }}</span>
               </div>
             </div>
           </div>

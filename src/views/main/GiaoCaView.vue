@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { formatCurrency as utilsFormatCurrency, formatDateTime as utilsFormatDateTime } from '@/utils/format'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -166,20 +167,11 @@ onMounted(() => {
 
 // Formatting Helpers
 const formatCurrency = (val) => {
-  if (val === null || val === undefined) return '0 đ'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)
+  return utilsFormatCurrency(val)
 }
 
 const formatDateTime = (dateTimeStr) => {
-  if (!dateTimeStr) return ''
-  const date = new Date(dateTimeStr)
-  return date.toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
+  return utilsFormatDateTime(dateTimeStr)
 }
 
 // Computations

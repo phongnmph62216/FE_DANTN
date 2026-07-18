@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../services/api'
+import { sortNewestAtTop } from '@/utils/format'
 
 const router = useRouter()
 
@@ -50,28 +51,7 @@ const totalPages = ref(1)
 const totalElements = ref(0)
 const pageSize = ref(10)
 
-// Helper to format currency
-const formatPrice = (price) => {
-  if (price === null || price === undefined) return '0đ'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-    .format(price)
-    .replace(/\s?₫/, 'đ')
-}
-
-// Helper to format dates
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  try {
-    const d = new Date(dateString)
-    if (isNaN(d.getTime())) return dateString
-    const day = String(d.getDate()).padStart(2, '0')
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const year = d.getFullYear()
-    return `${day}/${month}/${year}`
-  } catch (e) {
-    return dateString
-  }
-}
+// Get dynamic status badge info
 
 const getStatusBadge = (item) => {
   if (item.trangThai === 2) {
@@ -154,7 +134,7 @@ const fetchVouchers = async (page = 0) => {
         content = content.filter(item => item.kieuApDung === applyTypeVal)
       }
 
-      vouchers.value = content
+      vouchers.value = sortNewestAtTop('voucher', content)
       totalPages.value = data.totalPages || 1
       totalElements.value = data.totalElements || 0
     }
@@ -440,20 +420,20 @@ onMounted(() => {
               <td class="py-4 px-4">
                 <div class="flex flex-col">
                   <span class="font-bold text-brand-orange font-body-md">
-                    {{ item.loaiGiam === 0 ? `Giảm ${item.giaTri}%` : `Giảm ${formatPrice(item.giaTri)}` }}
+                    {{ item.loaiGiam === 0 ? `Giảm ${item.giaTri}%` : `Giảm ${$format.currency(item.giaTri)}` }}
                   </span>
                   <span v-if="item.loaiGiam === 0 && item.giaGiamToiDa" class="text-xs text-gray-400 mt-0.5">
-                    Tối đa: {{ formatPrice(item.giaGiamToiDa) }}
+                    Tối đa: {{ $format.currency(item.giaGiamToiDa) }}
                   </span>
                   <span class="text-xs text-gray-400">
-                    Đơn từ: {{ formatPrice(item.dieuKienGiam) }}
+                    Đơn từ: {{ $format.currency(item.dieuKienGiam) }}
                   </span>
                 </div>
               </td>
               <td class="py-4 px-4 font-body-md text-gray-600">
                 <div class="flex flex-col">
-                  <span>Từ: {{ formatDate(item.ngayBatDau) }}</span>
-                  <span>Đến: {{ formatDate(item.ngayKetThuc) }}</span>
+                  <span>Từ: {{ $format.date(item.ngayBatDau) }}</span>
+                  <span>Đến: {{ $format.date(item.ngayKetThuc) }}</span>
                 </div>
               </td>
               <td class="py-4 px-4 font-body-md text-gray-600">

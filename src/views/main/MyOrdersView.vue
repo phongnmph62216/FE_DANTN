@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
+import { formatCurrency as utilsFormatCurrency, formatDateTime as utilsFormatDateTime } from '@/utils/format'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -89,22 +90,12 @@ const filteredOrders = computed(() => {
 
 // Currency Formatter
 const formatCurrency = (val) => {
-  if (val === null || val === undefined) return '0 đ'
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
+  return utilsFormatCurrency(val)
 }
 
 // Date Formatter
 const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
+  return utilsFormatDateTime(dateStr)
 }
 
 // Status Badges & Styling Helpers

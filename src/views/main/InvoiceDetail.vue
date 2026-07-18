@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../../services/api'
+import { formatCurrency as formatPriceVND, formatDateTime as baseFormatDateTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,9 +31,8 @@ const showToast = (message, type = 'success') => {
 }
 
 // Helpers
-const formatPriceVND = (price) => {
-  if (price === null || price === undefined) return '0 đ'
-  return new Intl.NumberFormat('vi-VN').format(price) + ' đ'
+const formatDateTime = (dateString) => {
+  return baseFormatDateTime(dateString) || '—'
 }
 
 const formatPrintDate = (dateString) => {
@@ -44,23 +44,6 @@ const formatPrintDate = (dateString) => {
     const month = d.getMonth() + 1
     const year = d.getFullYear()
     return `Ngày ${day} tháng ${month} năm ${year}`
-  } catch (e) {
-    return dateString
-  }
-}
-
-const formatDateTime = (dateString) => {
-  if (!dateString) return '—'
-  try {
-    const d = new Date(dateString)
-    if (isNaN(d.getTime())) return dateString
-    const hours = String(d.getHours()).padStart(2, '0')
-    const minutes = String(d.getMinutes()).padStart(2, '0')
-    const seconds = String(d.getSeconds()).padStart(2, '0')
-    const day = d.getDate()
-    const month = d.getMonth() + 1
-    const year = d.getFullYear()
-    return `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`
   } catch (e) {
     return dateString
   }

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../../services/api'
+import { trackNewItem } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -586,6 +587,7 @@ const saveCustomer = async () => {
             diaChiMacDinh: form.value.diaChiMacDinh,
             diaChiList: diaChiList.value
           })
+          trackNewItem('customer', newIdNum)
           showToast('Thêm khách hàng thành công (Mock)!', 'success')
         }
         
@@ -621,19 +623,22 @@ const saveCustomer = async () => {
             const content = listRes.data?.content || []
             const createdCustomer = content.find(c => c.sdt === payload.sdt || c.maKhachHang === payload.maKhachHang)
             
-            if (createdCustomer && diaChiList.value.length > 0) {
-              // Post addresses sequentially for this customer
-              for (const addr of diaChiList.value) {
-                const addrPayload = {
-                  tenNguoiNhan: addr.tenNguoiNhan,
-                  sdtNguoiNhan: addr.sdtNguoiNhan,
-                  diaChiCuThe: addr.diaChiCuThe,
-                  tinhThanhPho: addr.tinhThanhPho,
-                  quanHuyen: addr.quanHuyen,
-                  phuongXa: addr.phuongXa,
-                  kieuDiaChiLaMacDinh: addr.kieuDiaChiLaMacDinh
+            if (createdCustomer) {
+              trackNewItem('customer', createdCustomer.id)
+              if (diaChiList.value.length > 0) {
+                // Post addresses sequentially for this customer
+                for (const addr of diaChiList.value) {
+                  const addrPayload = {
+                    tenNguoiNhan: addr.tenNguoiNhan,
+                    sdtNguoiNhan: addr.sdtNguoiNhan,
+                    diaChiCuThe: addr.diaChiCuThe,
+                    tinhThanhPho: addr.tinhThanhPho,
+                    quanHuyen: addr.quanHuyen,
+                    phuongXa: addr.phuongXa,
+                    kieuDiaChiLaMacDinh: addr.kieuDiaChiLaMacDinh
+                  }
+                  await api.post(`/api/v1/khach-hang/${createdCustomer.id}/dia-chi`, addrPayload)
                 }
-                await api.post(`/api/v1/khach-hang/${createdCustomer.id}/dia-chi`, addrPayload)
               }
             }
 
