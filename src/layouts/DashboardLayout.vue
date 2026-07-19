@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { formatCurrency as utilsFormatCurrency, formatDateTime as utilsFormatDateTime } from '@/utils/format'
@@ -23,24 +23,94 @@ const handleLogout = () => {
 }
 
 // Notifications state and functions
-import { onMounted, onUnmounted } from 'vue'
+import { useNotificationStore } from '@/stores/notification'
 import api from '@/services/api'
 
-const notifications = ref([])
-const unreadCount = ref(0)
+const notificationStore = useNotificationStore()
+
+const notifications = computed(() => notificationStore.notifications)
+const unreadCount = computed(() => notificationStore.unreadCount)
 const showNotificationsPanel = ref(false)
+const isRinging = ref(false)
 
-const fetchNotifications = async () => {
+const playNotificationSound = async () => {
   try {
-    const resCount = await api.get('/api/v1/thong-bao/chua-doc/count')
-    unreadCount.value = typeof resCount.data === 'number' ? resCount.data : 0
-
-    const resList = await api.get('/api/v1/thong-bao')
-    notifications.value = resList.data || []
-  } catch (error) {
-    console.error('Error fetching notifications:', error)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume()
+    }
+    const playTone = (freq, startTime, duration) => {
+      const osc = audioCtx.createOscillator()
+      const gainNode = audioCtx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, startTime)
+      gainNode.gain.setValueAtTime(0.3, startTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
+      osc.connect(gainNode)
+      gainNode.connect(audioCtx.destination)
+      osc.start(startTime)
+      osc.stop(startTime + duration)
+    }
+    const now = audioCtx.currentTime
+    // Double-ding premium chime sound
+    playTone(880, now, 0.4)
+    playTone(1320, now + 0.15, 0.5)
+  } catch (e) {
+    console.error('AudioContext sound failed:', e)
   }
 }
+
+const triggerBellAlert = () => {
+  isRinging.value = true
+  playNotificationSound()
+  setTimeout(() => {
+    isRinging.value = false
+  }, 5000)
+}
+
+watch(() => notificationStore.ringTrigger, (newVal) => {
+  if (newVal > 0) {
+    triggerBellAlert()
+  }
+})
+
+let reminderInterval = null
+
+const startReminderTimer = () => {
+  if (reminderInterval) clearInterval(reminderInterval)
+  const checkAndAlert = async () => {
+    if (!authStore.isLoggedIn || !authStore.isAdminOrStaff) return
+    try {
+      await notificationStore.checkPendingOrders()
+      if (notificationStore.pendingOrdersCount > 0) {
+        console.log(`Reminder: there are ${notificationStore.pendingOrdersCount} orders pending confirmation. Shaking bell...`)
+        triggerBellAlert()
+      }
+    } catch (e) {
+      console.error('Error checking pending orders in reminder:', e)
+    }
+  }
+  // Immediately check, then check every 2 minutes (120000ms)
+  checkAndAlert()
+  reminderInterval = setInterval(checkAndAlert, 120000)
+}
+
+const stopReminderTimer = () => {
+  if (reminderInterval) {
+    clearInterval(reminderInterval)
+    reminderInterval = null
+  }
+}
+
+watch(() => authStore.user, (newVal) => {
+  if (newVal && authStore.isAdminOrStaff) {
+    notificationStore.connectWs()
+    startReminderTimer()
+  } else {
+    notificationStore.disconnectWs()
+    stopReminderTimer()
+  }
+}, { deep: true, immediate: true })
 
 const toggleNotificationsPanel = (event) => {
   event.stopPropagation()
@@ -53,8 +123,7 @@ const closeNotificationsPanel = () => {
 
 const handleNotificationClick = async (notif) => {
   try {
-    await api.put(`/api/v1/thong-bao/${notif.id}/da-doc`)
-    await fetchNotifications()
+    await notificationStore.markAsRead(notif.id)
     if (notif.idHoaDon) {
       router.push(`/invoices/${notif.idHoaDon}`)
     } else {
@@ -62,16 +131,31 @@ const handleNotificationClick = async (notif) => {
     }
     closeNotificationsPanel()
   } catch (error) {
-    console.error('Error marking notification as read:', error)
+    console.error('Error handling notification click:', error)
   }
 }
 
 const markAllAsRead = async () => {
   try {
-    await api.put('/api/v1/thong-bao/da-doc-tat-ca')
-    await fetchNotifications()
+    await notificationStore.markAllAsRead()
   } catch (error) {
     console.error('Error marking all as read:', error)
+  }
+}
+
+const handleDeleteClick = async (id) => {
+  try {
+    await notificationStore.deleteNotification(id)
+  } catch (error) {
+    console.error('Error deleting notification:', error)
+  }
+}
+
+const handleClearAll = async () => {
+  try {
+    await notificationStore.clearAllNotifications()
+  } catch (error) {
+    console.error('Error clearing all notifications:', error)
   }
 }
 
@@ -148,16 +232,21 @@ const handleOpenShift = async () => {
 
 let pollInterval = null
 onMounted(() => {
-  fetchNotifications()
-  pollInterval = setInterval(fetchNotifications, 10000)
+  notificationStore.fetchNotifications()
+  pollInterval = setInterval(() => notificationStore.fetchNotifications(), 10000)
   document.addEventListener('click', closeNotificationsPanel)
   checkShiftStatus()
+  notificationStore.connectWs()
+  if (authStore.isLoggedIn && authStore.isAdminOrStaff) {
+    startReminderTimer()
+  }
 })
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
   document.removeEventListener('click', closeNotificationsPanel)
   stopClock()
+  stopReminderTimer()
 })
 
 watch(() => route.path, () => {
@@ -631,9 +720,10 @@ const getImageUrl = (url) => {
               @click.stop="toggleNotificationsPanel"
               class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-all cursor-pointer relative group flex items-center justify-center"
             >
-              <span class="material-symbols-outlined group-hover:text-primary transition-colors">notifications</span>
+              <span :class="{ 'animate-ring': isRinging }" class="material-symbols-outlined group-hover:text-primary transition-colors">notifications</span>
               <span 
                 v-if="unreadCount > 0"
+                :class="{ 'animate-pulse-badge': isRinging }"
                 class="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-[#FFB74D] to-[#EF972D] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-surface-container-lowest scale-90"
               >
                 {{ unreadCount }}
@@ -669,7 +759,7 @@ const getImageUrl = (url) => {
                   v-for="notif in notifications" 
                   :key="notif.id"
                   @click="handleNotificationClick(notif)"
-                  class="p-3.5 hover:bg-surface-container-low transition-colors cursor-pointer flex gap-3 items-start"
+                  class="p-3.5 hover:bg-surface-container-low transition-colors cursor-pointer flex gap-3 items-start group/item relative"
                   :class="{ 'bg-surface-container-lowest': notif.trangThai === 0 }"
                 >
                   <div class="mt-1.5 flex-shrink-0">
@@ -678,12 +768,30 @@ const getImageUrl = (url) => {
                       :class="notif.trangThai === 0 ? 'bg-primary' : 'bg-outline-variant/40'"
                     ></span>
                   </div>
-                  <div class="flex-1 flex flex-col gap-0.5">
+                  <div class="flex-1 flex flex-col gap-0.5 pr-6">
                     <h5 class="text-xs font-bold text-on-surface line-clamp-1 text-left">{{ notif.tieuDe }}</h5>
                     <p class="text-[11px] text-on-surface-variant leading-relaxed line-clamp-2 text-left">{{ notif.noiDung }}</p>
                     <span class="text-[10px] text-on-surface-variant/60 mt-1 text-left">{{ formatDate(notif.ngayTao) }}</span>
                   </div>
+                  <button 
+                    @click.stop="handleDeleteClick(notif.id)"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-on-surface-variant hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/item:opacity-100 transition-all duration-200 cursor-pointer flex items-center justify-center"
+                    title="Xóa thông báo"
+                  >
+                    <span class="material-symbols-outlined text-[16px]">delete</span>
+                  </button>
                 </div>
+              </div>
+
+              <!-- Footer (Clear All) -->
+              <div v-if="notifications.length > 0" class="p-2 border-t border-outline-variant/30 bg-surface flex justify-center">
+                <button 
+                  @click="handleClearAll"
+                  class="text-xs text-red-500 hover:text-red-700 font-semibold cursor-pointer w-full py-1.5 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-1"
+                >
+                  <span class="material-symbols-outlined text-[16px]">delete_sweep</span>
+                  Xóa tất cả thông báo
+                </button>
               </div>
             </div>
           </div>
@@ -840,5 +948,33 @@ const getImageUrl = (url) => {
 }
 .animate-slide-up {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ring {
+  0% { transform: rotate(0); }
+  10% { transform: rotate(15deg); }
+  20% { transform: rotate(-10deg); }
+  30% { transform: rotate(8deg); }
+  40% { transform: rotate(-6deg); }
+  50% { transform: rotate(4deg); }
+  60% { transform: rotate(-3deg); }
+  70% { transform: rotate(2deg); }
+  80% { transform: rotate(-1deg); }
+  90% { transform: rotate(1deg); }
+  100% { transform: rotate(0); }
+}
+.animate-ring {
+  display: inline-block;
+  animation: ring 1.5s infinite;
+  transform-origin: top center;
+  color: #EF972D !important;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(0.9); }
+  50% { transform: scale(1.2); }
+}
+.animate-pulse-badge {
+  animation: pulse-badge 1.5s infinite;
 }
 </style>

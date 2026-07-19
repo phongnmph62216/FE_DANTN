@@ -140,6 +140,8 @@ const sendBotMessage = async (query) => {
   scrollToBottom()
   isTyping.value = true
   try {
+    // Refresh product cache to ensure inline cards show latest prices/data
+    await fetchProductsCache()
     const response = await api.post('/api/v1/chatbot/chat', { message: query, history: geminiHistory.value })
     geminiHistory.value.push({ role: 'user', parts: [{ text: query }] })
     const botResponseText = response.data

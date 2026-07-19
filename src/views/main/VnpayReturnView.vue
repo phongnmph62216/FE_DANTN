@@ -83,10 +83,10 @@ onMounted(async () => {
       <span class="material-symbols-outlined text-[72px] text-red-500" style="font-variation-settings: 'FILL' 1;">cancel</span>
       <h2 class="text-headline-lg font-headline-lg text-red-500 font-bold">THANH TOÁN THẤT BẠI!</h2>
       <p class="text-body-lg text-on-surface">
-        Giao dịch không thành công. Mã lỗi: <span class="font-bold font-mono">{{ paymentResult?.responseCode }}</span>
+        Giao dịch không thành công hoặc bị hủy. Đơn hàng của bạn đã được hủy bỏ và sản phẩm đã hoàn trả lại kho.
       </p>
       <p class="text-body-md text-on-surface-variant">
-        Vui lòng thử lại hoặc chọn phương thức thanh toán khác.
+        Mã lỗi: <span class="font-bold font-mono">{{ paymentResult?.responseCode }}</span>. Vui lòng đặt hàng lại hoặc chọn phương thức thanh toán khác.
       </p>
 
       <div class="flex flex-col sm:flex-row gap-4 w-full justify-center mt-4">
