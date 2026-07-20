@@ -218,6 +218,18 @@ const decrementQuantity = () => {
   }
 }
 
+const updateQuantity = (val) => {
+  let num = parseInt(val, 10)
+  if (isNaN(num) || num < 1) {
+    num = 1
+  }
+  if (selectedVariant.value && selectedVariant.value.stock && num > selectedVariant.value.stock) {
+    alert(`Số lượng chọn vượt quá tồn kho (${selectedVariant.value.stock})!`)
+    num = selectedVariant.value.stock
+  }
+  quantity.value = num
+}
+
 // Add to Cart handler
 const addToCart = (redirect = false) => {
   if (!selectedVariant.value) {
@@ -447,7 +459,16 @@ onMounted(() => {
           <div class="flex items-center gap-6 flex-wrap">
             <div class="flex border border-outline-variant rounded overflow-hidden w-32 h-10 shrink-0">
               <button @click="decrementQuantity" class="w-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-variant transition-colors focus:outline-none font-bold">-</button>
-              <input aria-label="quantity" class="w-full text-center border-none focus:ring-0 text-body-md font-bold p-0 bg-transparent" type="text" readonly :value="quantity">
+              <input 
+                aria-label="quantity" 
+                class="w-full text-center border-none focus:ring-0 text-body-md font-bold p-0 bg-transparent focus:outline-none" 
+                type="number" 
+                min="1"
+                :max="selectedVariant?.stock"
+                :value="quantity"
+                @change="updateQuantity($event.target.value)"
+                @blur="updateQuantity($event.target.value)"
+              >
               <button @click="incrementQuantity" class="w-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-variant transition-colors focus:outline-none font-bold">+</button>
             </div>
             <div class="flex flex-col gap-1">

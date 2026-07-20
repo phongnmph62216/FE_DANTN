@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -227,9 +227,149 @@ const shippingFee = computed(() => {
 
 const totalPayment = computed(() => Math.max(0, subtotal.value + shippingFee.value - discountAmount.value))
 
+// Payment channel limits
+const MAX_COD_AMOUNT = 5000000 // 5.000.000 VNĐ (COD limit for GHN risk control)
+const MAX_ONLINE_TRANSACTION_AMOUNT = 20000000 // 20.000.000 VNĐ (Max transaction limit for online wallets/banks)
+
+const isCodAllowed = computed(() => {
+  if (!authStore.isLoggedIn) return false
+  if (totalPayment.value > MAX_COD_AMOUNT) return false
+  return true
+})
+
+const isTotalPaymentExceedsLimit = computed(() => {
+  return totalPayment.value > MAX_ONLINE_TRANSACTION_AMOUNT
+})
+
+watch([totalPayment, () => authStore.isLoggedIn], () => {
+  if (!isCodAllowed.value && paymentMethod.value === 'COD') {
+    paymentMethod.value = 'VNPAY'
+  }
+}, { immediate: true })
+
 const formatCurrency = (val) => {
   return utilsFormatCurrency(val)
 }
+
+// Voucher calculation & ownership helpers
+const isVoucherApplicableToUser = (v) => {
+  if (!v) return false
+  // kiêuÁpDụng: 0 = Tất cả (Công khai), 1 = Cá nhân (Chỉ dành cho các ID được gán)
+  if (v.kieuApDung === 1) {
+    if (!authStore.isLoggedIn || !authStore.user?.id) return false
+    if (!v.danhSachKhachHangIds || !Array.isArray(v.danhSachKhachHangIds) || !v.danhSachKhachHangIds.includes(authStore.user.id)) {
+      return false
+    }
+  }
+  return true
+}
+
+const calculateVoucherDiscount = (v, totalVal) => {
+  if (!v || totalVal < (v.dieuKienGiam || 0)) return 0
+  if (!isVoucherApplicableToUser(v)) return 0
+  const remainingQty = v.soLuong - (v.soLuongDaDung || 0)
+  if (remainingQty <= 0) return 0
+
+  let disc = 0
+  if (v.loaiGiam === 0) { // %
+    disc = totalVal * (v.giaTri / 100)
+    if (v.giaGiamToiDa && disc > v.giaGiamToiDa) {
+      disc = v.giaGiamToiDa
+    }
+  } else { // Cash
+    disc = v.giaTri
+  }
+  if (disc > totalVal) {
+    disc = totalVal
+  }
+  return Math.floor(disc)
+}
+
+const findBestVoucher = (vouchers, totalVal) => {
+  if (!vouchers || vouchers.length === 0 || totalVal <= 0) return null
+  let best = null
+  let maxDisc = 0
+
+  vouchers.forEach(v => {
+    if (isVoucherApplicableToUser(v)) {
+      const disc = calculateVoucherDiscount(v, totalVal)
+      if (disc > maxDisc) {
+        maxDisc = disc
+        best = v
+      } else if (disc > 0 && disc === maxDisc && best) {
+        if (v.dieuKienGiam < best.dieuKienGiam) {
+          best = v
+        }
+      }
+    }
+  })
+  return best
+}
+
+const autoAppliedBadge = ref(false)
+
+const bestVoucher = computed(() => {
+  return findBestVoucher(activeVouchers.value, subtotal.value)
+})
+
+// Chỉ hiển thị các phiếu giảm giá ĐÃ THỎA MÃN ĐIỀU KIỆN và ĐƯỢC PHÉP DÙNG cho khách hàng hiện tại
+const sortedActiveVouchers = computed(() => {
+  if (!activeVouchers.value) return []
+  return activeVouchers.value
+    .filter(v => isVoucherApplicableToUser(v) && subtotal.value >= v.dieuKienGiam && (v.soLuong - (v.soLuongDaDung || 0) > 0))
+    .sort((a, b) => {
+      const discA = calculateVoucherDiscount(a, subtotal.value)
+      const discB = calculateVoucherDiscount(b, subtotal.value)
+      return discB - discA
+    })
+})
+
+// Gợi ý phiếu giảm giá công khai (hoặc cá nhân chính chủ) có điều kiện gần nhất với giá trị giỏ hàng
+const upsellVoucher = computed(() => {
+  if (!activeVouchers.value || activeVouchers.value.length === 0 || subtotal.value <= 0) return null
+
+  const currentDisc = discountAmount.value || 0
+  let candidates = []
+
+  activeVouchers.value.forEach(v => {
+    // Chỉ xét các voucher ĐƯỢC PHÉP DÙNG cho khách hàng hiện tại (không lấy voucher cá nhân người khác)
+    if (isVoucherApplicableToUser(v)) {
+      const remainingQty = v.soLuong - (v.soLuongDaDung || 0)
+      if (remainingQty > 0 && subtotal.value < (v.dieuKienGiam || 0)) {
+        let potentialDisc = 0
+        if (v.loaiGiam === 0) { // %
+          potentialDisc = v.dieuKienGiam * (v.giaTri / 100)
+          if (v.giaGiamToiDa && potentialDisc > v.giaGiamToiDa) {
+            potentialDisc = v.giaGiamToiDa
+          }
+        } else {
+          potentialDisc = v.giaTri
+        }
+
+        if (potentialDisc > currentDisc) {
+          const amountNeeded = v.dieuKienGiam - subtotal.value
+          candidates.push({
+            ...v,
+            amountNeeded,
+            potentialDiscount: potentialDisc
+          })
+        }
+      }
+    }
+  })
+
+  if (candidates.length === 0) return null
+
+  // Sắp xếp ưu tiên: (1) Cần mua thêm ít nhất (gần giá hiện tại nhất), (2) Giảm nhiều nhất
+  candidates.sort((a, b) => {
+    if (a.amountNeeded !== b.amountNeeded) {
+      return a.amountNeeded - b.amountNeeded
+    }
+    return b.potentialDiscount - a.potentialDiscount
+  })
+
+  return candidates[0]
+})
 
 // Apply Voucher
 const applyVoucher = async () => {
@@ -237,6 +377,7 @@ const applyVoucher = async () => {
   voucherSuccess.value = ''
   discountAmount.value = 0
   appliedVoucher.value = null
+  autoAppliedBadge.value = false
   
   if (!voucherCode.value) {
     voucherError.value = 'Vui lòng nhập mã giảm giá'
@@ -260,12 +401,17 @@ const applyVoucher = async () => {
       return
     }
 
+    if (!isVoucherApplicableToUser(found)) {
+      voucherError.value = 'Mã giảm giá này là phiếu cá nhân dành riêng cho tài khoản khác!'
+      return
+    }
+
     if (subtotal.value < found.dieuKienGiam) {
       voucherError.value = `Đơn hàng chưa đạt điều kiện tối thiểu ${formatCurrency(found.dieuKienGiam)}!`
       return
     }
 
-    if (found.soLuong <= found.soLuongDaDung) {
+    if (found.soLuong <= (found.soLuongDaDung || 0)) {
       voucherError.value = 'Mã giảm giá đã hết số lượng sử dụng!'
       return
     }
@@ -284,20 +430,7 @@ const calculateDiscount = () => {
     discountAmount.value = 0
     return
   }
-  const found = appliedVoucher.value
-  let disc = 0
-  if (found.loaiGiam === 0) { // %
-    disc = subtotal.value * (found.giaTri / 100)
-    if (found.giaGiamToiDa && disc > found.giaGiamToiDa) {
-      disc = found.giaGiamToiDa
-    }
-  } else { // Cash
-    disc = found.giaTri
-  }
-  if (disc > subtotal.value) {
-    disc = subtotal.value
-  }
-  discountAmount.value = Math.floor(disc)
+  discountAmount.value = calculateVoucherDiscount(appliedVoucher.value, subtotal.value)
 }
 
 const errors = ref({
@@ -384,6 +517,17 @@ const submitOrder = (e) => {
 
   if (cartItems.value.length === 0) {
     alert('Giỏ hàng của bạn đang trống!')
+    return
+  }
+
+  if (isTotalPaymentExceedsLimit.value) {
+    paymentError.value = `Tổng đơn hàng là ${formatCurrency(totalPayment.value)}, vượt quá hạn mức giao dịch tối đa 20.000.000đ mỗi lần. Vui lòng giảm bớt sản phẩm hoặc liên hệ bộ phận hỗ trợ.`
+    return
+  }
+
+  if (paymentMethod.value === 'COD' && !isCodAllowed.value) {
+    paymentError.value = 'Đơn hàng trên 5.000.000đ không hỗ trợ thanh toán COD (Giao hàng thu tiền). Vui lòng chuyển sang thanh toán Online VNPAY.'
+    paymentMethod.value = 'VNPAY'
     return
   }
 
@@ -548,19 +692,31 @@ const clearAddressForm = () => {
 const activeVouchers = ref([])
 const showVoucherModal = ref(false)
 
-const fetchActiveVouchers = async () => {
+const fetchActiveVouchers = async (autoApply = false) => {
   try {
     const res = await api.get('/api/v1/phieu-giam-gia', {
       params: { trangThai: 1, page: 0, size: 100 }
     })
     activeVouchers.value = res.data?.content || []
+
+    if (autoApply && subtotal.value > 0) {
+      const best = findBestVoucher(activeVouchers.value, subtotal.value)
+      if (best) {
+        appliedVoucher.value = best
+        voucherCode.value = best.maPhieuGiamGia
+        calculateDiscount()
+        autoAppliedBadge.value = true
+        voucherSuccess.value = `Đã tự động áp dụng mã tốt nhất: ${best.maPhieuGiamGia}`
+        voucherError.value = ''
+      }
+    }
   } catch (err) {
     console.error('Failed to load active vouchers:', err)
   }
 }
 
 const openVoucherModal = async () => {
-  await fetchActiveVouchers()
+  await fetchActiveVouchers(false)
   showVoucherModal.value = true
 }
 
@@ -586,6 +742,7 @@ onMounted(async () => {
   if (authStore.isLoggedIn) {
     await loadCustomerAddresses()
   }
+  await fetchActiveVouchers(true)
 })
 </script>
 
@@ -781,22 +938,26 @@ onMounted(async () => {
           <div class="flex flex-col gap-4">
             <label 
               class="flex items-start gap-3 group"
-              :class="authStore.isLoggedIn ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
+              :class="isCodAllowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
             >
               <input 
                 v-model="paymentMethod" 
                 value="COD" 
-                :disabled="!authStore.isLoggedIn"
+                :disabled="!isCodAllowed"
                 class="text-[#ef972d] focus:ring-[#ef972d] border-outline-variant h-4 w-4 mt-0.5" 
                 name="payment_method" 
                 type="radio"
               />
               <div class="flex flex-col">
-                <span class="text-body-md text-on-surface transition-colors" :class="authStore.isLoggedIn && 'group-hover:text-[#ef972d]'">
+                <span class="text-body-md text-on-surface transition-colors" :class="isCodAllowed && 'group-hover:text-[#ef972d]'">
                   Thanh toán khi nhận hàng (COD)
                 </span>
                 <span v-if="!authStore.isLoggedIn" class="text-xs text-red-500 font-bold mt-1 bg-red-50 border border-red-100 rounded px-2 py-1 max-w-max">
                   Yêu cầu đăng nhập để sử dụng phương thức này nhằm hạn chế bom hàng.
+                </span>
+                <span v-else-if="totalPayment > 5000000" class="text-xs text-amber-700 font-bold mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1 max-w-max flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">warning</span>
+                  Đơn hàng vượt 5.000.000đ. Không hỗ trợ COD để đảm bảo chính sách bồi thường GHN.
                 </span>
               </div>
             </label>
@@ -804,6 +965,14 @@ onMounted(async () => {
               <input v-model="paymentMethod" value="VNPAY" class="text-[#ef972d] focus:ring-[#ef972d] border-outline-variant h-4 w-4" name="payment_method" type="radio"/>
               <span class="text-body-md text-on-surface group-hover:text-[#ef972d] transition-colors">Thẻ ATM/Visa/Master/JCB/QR Pay qua VNPAY-QR</span>
             </label>
+
+            <!-- Exceeds 20m transaction limit warning -->
+            <div v-if="isTotalPaymentExceedsLimit" class="bg-red-50 border border-red-200 text-red-700 p-3 rounded text-xs font-semibold leading-relaxed flex items-start gap-2 mt-1">
+              <span class="material-symbols-outlined text-red-600 text-base shrink-0 mt-0.5" style="font-variation-settings: 'FILL' 1;">error</span>
+              <div>
+                Đơn hàng hiện tại là <strong>{{ formatCurrency(totalPayment) }}</strong>, vượt quá hạn mức thanh toán tối đa <strong>20.000.000đ</strong> cho mỗi giao dịch. Vui lòng chia nhỏ số lượng sản phẩm hoặc liên hệ CSKH.
+              </div>
+            </div>
           </div>
         </div>
 
@@ -861,7 +1030,12 @@ onMounted(async () => {
           <div class="flex flex-col gap-4">
             <!-- Voucher -->
             <div class="flex flex-col gap-2">
-              <label class="font-label-sm text-on-surface-variant uppercase text-xs font-bold">MÃ PHIẾU GIẢM GIÁ</label>
+              <div class="flex justify-between items-center">
+                <label class="font-label-sm text-on-surface-variant uppercase text-xs font-bold">MÃ PHIẾU GIẢM GIÁ</label>
+                <span v-if="autoAppliedBadge" class="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[12px]">bolt</span> Tự động chọn mã tốt nhất
+                </span>
+              </div>
               <div class="flex w-full">
                 <input v-model="voucherCode" class="flex-grow border border-outline-variant rounded-l p-3 bg-transparent text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors border-r-0" placeholder="Nhập mã giảm giá..." type="text"/>
                 <button type="button" @click="applyVoucher" class="bg-[#ef972d] hover:bg-[#d88523] text-white font-label-sm uppercase px-4 py-3 rounded-r transition-colors focus:outline-none font-bold">ÁP DỤNG</button>
@@ -876,6 +1050,19 @@ onMounted(async () => {
               </button>
               <p v-if="voucherError" class="text-error text-xs mt-1 font-semibold text-red-500">{{ voucherError }}</p>
               <p v-if="voucherSuccess" class="text-green-600 text-xs mt-1 font-semibold text-emerald-600">{{ voucherSuccess }}</p>
+            </div>
+
+            <!-- Smart Upsell Suggestion Banner (Công khai / Chính chủ) -->
+            <div v-if="upsellVoucher" class="bg-gradient-to-r from-amber-50 to-orange-50 border border-[#ef972d]/40 rounded-lg p-3.5 my-1 flex flex-col gap-2 shadow-xs">
+              <div class="flex items-start gap-2">
+                <span class="material-symbols-outlined text-[#ef972d] text-xl flex-shrink-0 mt-0.5" style="font-variation-settings: 'FILL' 1;">lightbulb</span>
+                <div class="text-xs text-slate-700 leading-relaxed">
+                  Gợi ý: Mua thêm <strong class="text-[#ef972d] font-bold">{{ formatCurrency(upsellVoucher.amountNeeded) }}</strong> để áp dụng mã <strong class="bg-[#ef972d]/15 text-[#ef972d] px-1.5 py-0.5 rounded font-mono font-bold">{{ upsellVoucher.maPhieuGiamGia }}</strong> và được giảm ngay <strong class="text-emerald-600 font-bold">{{ formatCurrency(upsellVoucher.potentialDiscount) }}</strong>!
+                </div>
+              </div>
+              <RouterLink to="/" class="text-[11px] font-bold text-[#ef972d] hover:text-[#d88523] self-end flex items-center gap-0.5 transition-colors">
+                Xem sản phẩm mua thêm <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+              </RouterLink>
             </div>
 
             <div class="border-t-4 border-dotted border-outline-variant/50 my-2"></div>
@@ -943,58 +1130,67 @@ onMounted(async () => {
 
         <!-- Modal Body: Scrollable Voucher List -->
         <div class="flex-grow overflow-y-auto pr-1 flex flex-col gap-3">
-          <div v-if="activeVouchers.length === 0" class="text-slate-500 text-center py-8">
+          <div v-if="sortedActiveVouchers.length === 0" class="text-slate-500 text-center py-8">
             Hiện không có phiếu giảm giá nào khả dụng.
           </div>
           
           <div 
-            v-for="v in activeVouchers" 
+            v-for="v in sortedActiveVouchers" 
             :key="v.id"
             :class="[
               'p-4 rounded-lg border flex flex-col gap-2 relative transition-all',
-              subtotal >= v.dieuKienGiam
-                ? 'border-slate-200 bg-white hover:border-[#ef972d]/70'
-                : 'border-slate-100 bg-slate-50/50 opacity-60'
+              v.id === bestVoucher?.id
+                ? 'border-[#ef972d] bg-amber-50/40 shadow-xs ring-1 ring-[#ef972d]/30'
+                : 'border-slate-200 bg-white hover:border-[#ef972d]/70'
             ]"
           >
+            <!-- Best Voucher Badge -->
+            <div v-if="v.id === bestVoucher?.id" class="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-500 to-[#ef972d] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs flex items-center gap-0.5">
+              <span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">star</span> MÃ TỐT NHẤT
+            </div>
+
             <!-- Voucher Title and Code -->
             <div class="flex justify-between items-start gap-4">
               <div>
-                <span class="font-mono bg-[#ef972d]/10 text-[#ef972d] px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">
-                  {{ v.maPhieuGiamGia }}
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="font-mono bg-[#ef972d]/10 text-[#ef972d] px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">
+                    {{ v.maPhieuGiamGia }}
+                  </span>
+                  <span v-if="v.kieuApDung === 1" class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">Cá nhân</span>
+                  <span v-if="appliedVoucher?.id === v.id" class="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">Đang áp dụng</span>
+                </div>
                 <h4 class="font-bold text-slate-800 text-sm mt-1.5">{{ v.tenPhieuGiamGia }}</h4>
               </div>
               
-              <!-- Apply Button / Status Badge -->
+              <!-- Apply Button -->
               <button 
-                v-if="subtotal >= v.dieuKienGiam"
                 type="button"
                 @click="selectVoucherFromModal(v)"
-                class="bg-[#ef972d] hover:bg-[#d88523] text-white text-xs font-bold uppercase px-3 py-1.5 rounded transition-colors"
+                :class="[
+                  'text-xs font-bold uppercase px-3 py-1.5 rounded transition-colors',
+                  appliedVoucher?.id === v.id
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-[#ef972d] hover:bg-[#d88523] text-white'
+                ]"
               >
-                Áp dụng
+                {{ appliedVoucher?.id === v.id ? 'Đang chọn' : 'Áp dụng' }}
               </button>
-              <div 
-                v-else 
-                class="text-[10px] text-red-500 bg-red-50 border border-red-200 px-2 py-1 rounded font-semibold whitespace-nowrap"
-              >
-                Chưa đủ điều kiện
-              </div>
             </div>
 
             <!-- Description -->
             <div class="text-xs text-slate-500 flex flex-col gap-1 mt-1 border-t border-slate-100/80 pt-2">
-              <div>• Ưu đãi: 
-                <span class="font-bold text-slate-700">
-                  {{ v.loaiGiam === 0 ? `Giảm ${v.giaTri}%` : `Giảm ${formatCurrency(v.giaTri)}` }}
-                </span>
-                <span v-if="v.loaiGiam === 0 && v.giaGiamToiDa"> (Tối đa {{ formatCurrency(v.giaGiamToiDa) }})</span>
+              <div class="flex justify-between items-center">
+                <div>• Ưu đãi: 
+                  <span class="font-bold text-slate-700">
+                    {{ v.loaiGiam === 0 ? `Giảm ${v.giaTri}%` : `Giảm ${formatCurrency(v.giaTri)}` }}
+                  </span>
+                  <span v-if="v.loaiGiam === 0 && v.giaGiamToiDa"> (Tối đa {{ formatCurrency(v.giaGiamToiDa) }})</span>
+                </div>
+                <div class="text-emerald-600 font-bold text-xs">
+                  Giảm {{ formatCurrency(calculateVoucherDiscount(v, subtotal)) }}
+                </div>
               </div>
               <div>• Đơn tối thiểu: <span class="font-semibold text-slate-700">{{ formatCurrency(v.dieuKienGiam) }}</span></div>
-              <div v-if="subtotal < v.dieuKienGiam" class="text-red-500 font-medium">
-                * Cần mua thêm {{ formatCurrency(v.dieuKienGiam - subtotal) }} để sử dụng mã này
-              </div>
               <div class="flex justify-between items-center text-[11px] text-slate-400 mt-1">
                 <span>Số lượng còn lại: {{ v.soLuong - (v.soLuongDaDung || 0) }}</span>
                 <span>Hạn dùng: {{ $format.date(v.ngayKetThuc) }}</span>

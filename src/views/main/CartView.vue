@@ -30,6 +30,19 @@ const decrement = (item) => {
   }
 }
 
+const updateQuantity = (item, val) => {
+  let num = parseInt(val, 10)
+  if (isNaN(num) || num < 1) {
+    num = 1
+  }
+  if (item.stock && num > item.stock) {
+    alert(`Số lượng tồn kho tối đa là ${item.stock}!`)
+    num = item.stock
+  }
+  item.quantity = num
+  saveCart()
+}
+
 // Delete item
 const deleteItem = (item) => {
   cartItems.value = cartItems.value.filter(i => i.variantId !== item.variantId)
@@ -162,7 +175,15 @@ onMounted(() => {
               <span class="md:hidden font-label-sm text-label-sm uppercase text-on-surface-variant">Số Lượng:</span>
               <div class="flex items-center border border-outline-variant/50">
                 <button @click="decrement(item)" class="px-3 py-1 text-on-surface hover:bg-surface-variant transition-colors focus:outline-none font-bold">-</button>
-                <input class="w-12 text-center border-0 p-1 text-sm bg-transparent focus:ring-0 focus:outline-none font-bold" readonly type="number" :value="item.quantity"/>
+                <input 
+                  class="w-12 text-center border-0 p-1 text-sm bg-transparent focus:ring-0 focus:outline-none font-bold" 
+                  type="number" 
+                  min="1" 
+                  :max="item.stock"
+                  :value="item.quantity"
+                  @change="updateQuantity(item, $event.target.value)"
+                  @blur="updateQuantity(item, $event.target.value)"
+                />
                 <button @click="increment(item)" class="px-3 py-1 text-on-surface hover:bg-surface-variant transition-colors focus:outline-none font-bold">+</button>
               </div>
             </div>
@@ -189,7 +210,22 @@ onMounted(() => {
             <span class="font-body-md text-body-md text-on-surface">Tổng giá trị đơn hàng</span>
             <span class="font-title-md text-title-md text-[#EF972D] font-bold">{{ formatCurrency(totalPrice) }}</span>
           </div>
-          <RouterLink to="/checkout" class="w-full bg-[#EF972D] text-white py-4 font-label-sm text-label-sm uppercase tracking-widest hover:bg-[#EF972D]/90 transition-colors flex items-center justify-center gap-2 mt-4 shadow-sm font-bold">
+
+          <!-- Payment Channel Limits Info Badges -->
+          <div v-if="totalPrice > 20000000" class="bg-red-50 border border-red-200 text-red-700 p-3 rounded text-xs font-semibold leading-relaxed flex items-start gap-2">
+            <span class="material-symbols-outlined text-red-600 text-base shrink-0 mt-0.5">error</span>
+            <div>
+              Tổng đơn hàng vượt <strong>20.000.000đ</strong> (hạn mức thanh toán tối đa mỗi giao dịch). Vui lòng chia nhỏ đơn hàng trước khi thanh toán.
+            </div>
+          </div>
+          <div v-else-if="totalPrice > 5000000" class="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded text-xs font-semibold leading-relaxed flex items-start gap-2">
+            <span class="material-symbols-outlined text-amber-600 text-base shrink-0 mt-0.5">info</span>
+            <div>
+              Đơn hàng trên <strong>5.000.000đ</strong> chỉ hỗ trợ thanh toán Online (VNPAY) tại bước Đặt hàng để đảm bảo an toàn giao nhận GHN.
+            </div>
+          </div>
+
+          <RouterLink to="/checkout" class="w-full bg-[#EF972D] text-white py-4 font-label-sm text-label-sm uppercase tracking-widest hover:bg-[#EF972D]/90 transition-colors flex items-center justify-center gap-2 mt-2 shadow-sm font-bold">
             TIẾP TỤC THANH TOÁN
             <span class="material-symbols-outlined text-sm">arrow_forward</span>
           </RouterLink>
