@@ -8,6 +8,10 @@ import AllProductsView from '../views/main/AllProductsView.vue'
 import VnpayReturnView from '../views/main/VnpayReturnView.vue'
 import OrderLookupView from '../views/main/OrderLookupView.vue'
 import MyOrdersView from '../views/main/MyOrdersView.vue'
+import CustomerProfileView from '../views/main/CustomerProfileView.vue'
+import PromotionsView from '../views/main/PromotionsView.vue'
+import NewArrivalsView from '../views/main/NewArrivalsView.vue'
+import AboutUsView from '../views/main/AboutUsView.vue'
 import HomeView from '../views/main/HomeView.vue'
 import ThongKeView from '../views/main/ThongKeView.vue'
 import ProductList from '../views/main/ProductList.vue'
@@ -94,7 +98,27 @@ const router = createRouter({
     },
     {
       path: '/profile',
-      redirect: '/my-orders'
+      name: 'customer-profile',
+      component: CustomerProfileView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/uu-dai',
+      name: 'promotions',
+      component: PromotionsView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/moi-ve',
+      name: 'new-arrivals',
+      component: NewArrivalsView,
+      meta: { layout: 'CustomerLayout' },
+    },
+    {
+      path: '/ve-chung-toi',
+      name: 'about-us',
+      component: AboutUsView,
+      meta: { layout: 'CustomerLayout' },
     },
     {
       path: '/admin',

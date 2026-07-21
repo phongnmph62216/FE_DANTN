@@ -212,3 +212,20 @@ div.fixed.bottom-5.right-5[class*="blue"],
 div.fixed.bottom-5.right-5 > div {
   pointer-events: auto !important;
 }
+
+/* Global Dark Mode Styling */
+html.dark {
+  color-scheme: dark;
+  background-color: #0b1c30 !important;
+  color: #eaf1ff !important;
+  filter: invert(0.92) hue-rotate(180deg);
+}
+
+html.dark img,
+html.dark video,
+html.dark canvas,
+html.dark iframe,
+html.dark .material-symbols-outlined,
+html.dark [style*="background-image"] {
+  filter: invert(1) hue-rotate(180deg);
+}

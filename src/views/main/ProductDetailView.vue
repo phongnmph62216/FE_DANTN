@@ -2,11 +2,12 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, RouterLink, useRouter } from 'vue-router'
 import api from '../../services/api'
-
 import { formatCurrency } from '@/utils/format'
+import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
 const router = useRouter()
+const cartStore = useCartStore()
 const productId = route.params.id
 
 // Loading & Data States
@@ -218,13 +219,35 @@ const decrementQuantity = () => {
   }
 }
 
+const toast = ref({
+  show: false,
+  type: 'success',
+  title: '',
+  message: '',
+  productInfo: null
+})
+
+let toastTimer = null
+
+const showToastNotification = ({ type = 'success', title = '', message = '', productInfo = null }) => {
+  toast.value = { show: true, type, title, message, productInfo }
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toast.value.show = false
+  }, 4000)
+}
+
 const updateQuantity = (val) => {
   let num = parseInt(val, 10)
   if (isNaN(num) || num < 1) {
     num = 1
   }
   if (selectedVariant.value && selectedVariant.value.stock && num > selectedVariant.value.stock) {
-    alert(`Số lượng chọn vượt quá tồn kho (${selectedVariant.value.stock})!`)
+    showToastNotification({
+      type: 'warning',
+      title: 'Giới hạn tồn kho',
+      message: `Số lượng chọn vượt quá tồn kho hiện có (${selectedVariant.value.stock})!`
+    })
     num = selectedVariant.value.stock
   }
   quantity.value = num
@@ -233,52 +256,63 @@ const updateQuantity = (val) => {
 // Add to Cart handler
 const addToCart = (redirect = false) => {
   if (!selectedVariant.value) {
-    alert('Vui lòng chọn màu sắc và kích cỡ!')
+    showToastNotification({
+      type: 'warning',
+      title: 'Chưa chọn phân loại',
+      message: 'Vui lòng chọn Màu sắc và Kích cỡ sản phẩm trước khi thêm!'
+    })
     return
   }
   if (selectedVariant.value.stock <= 0) {
-    alert('Biến thể sản phẩm này đã hết hàng!')
+    showToastNotification({
+      type: 'error',
+      title: 'Hết hàng',
+      message: 'Biến thể sản phẩm này hiện đã hết hàng trong kho!'
+    })
     return
   }
   if (quantity.value > selectedVariant.value.stock) {
-    alert(`Số lượng chọn vượt quá tồn kho (${selectedVariant.value.stock})!`)
+    showToastNotification({
+      type: 'warning',
+      title: 'Giới hạn tồn kho',
+      message: `Số lượng chọn vượt quá tồn kho (${selectedVariant.value.stock})!`
+    })
     return
   }
 
-  // Load current cart
-  let cart = JSON.parse(localStorage.getItem('bee_cart') || '[]')
-  // Check if variant already exists in cart
-  const existing = cart.find(item => item.variantId === selectedVariant.value.id)
-  
   const unitPrice = selectedVariant.value.hasDiscount 
     ? selectedVariant.value.price * (100 - selectedVariant.value.discountPercent) / 100 
     : selectedVariant.value.price
 
-  if (existing) {
-    existing.quantity = Math.min(existing.stock, existing.quantity + quantity.value)
-  } else {
-    cart.push({
-      productId: product.value.id,
-      productName: product.value.name,
-      productCode: product.value.code,
-      variantId: selectedVariant.value.id,
-      variantCode: selectedVariant.value.code,
-      size: selectedVariant.value.size,
-      color: selectedVariant.value.color,
-      price: unitPrice,
-      originalPrice: selectedVariant.value.price,
-      image: selectedVariant.value.image,
-      quantity: quantity.value,
-      stock: selectedVariant.value.stock
-    })
-  }
-
-  localStorage.setItem('bee_cart', JSON.stringify(cart))
+  cartStore.addItem({
+    productId: product.value.id,
+    productName: product.value.name,
+    productCode: product.value.code,
+    variantId: selectedVariant.value.id,
+    variantCode: selectedVariant.value.code,
+    size: selectedVariant.value.size,
+    color: selectedVariant.value.color,
+    price: unitPrice,
+    originalPrice: selectedVariant.value.price,
+    image: selectedVariant.value.image || mainImage.value,
+    stock: selectedVariant.value.stock
+  }, quantity.value)
 
   if (redirect) {
     router.push('/cart')
   } else {
-    alert('Đã thêm sản phẩm vào giỏ hàng thành công!')
+    showToastNotification({
+      type: 'success',
+      title: 'ĐÃ THÊM VÀO GIỎ HÀNG',
+      message: `Đã thêm ${quantity.value}x "${product.value.name}" (Size: ${selectedVariant.value.size}, Màu: ${selectedVariant.value.color})`,
+      productInfo: {
+        image: selectedVariant.value.image || mainImage.value,
+        name: product.value.name,
+        size: selectedVariant.value.size,
+        color: selectedVariant.value.color,
+        price: unitPrice
+      }
+    })
   }
 }
 
@@ -504,6 +538,86 @@ onMounted(() => {
     <div class="text-sm leading-relaxed text-on-surface-variant whitespace-pre-line bg-surface p-6 border border-outline-variant/30">
       {{ product.moTa }}
     </div>
+
+    <!-- Beautiful Toast Notification Popup (Replaces Browser Alert) -->
+    <Transition
+      enter-active-class="transform transition-all duration-300 ease-out"
+      enter-from-class="translate-y-4 opacity-0 sm:translate-y-0 sm:translate-x-4"
+      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div 
+        v-if="toast.show" 
+        class="fixed top-24 right-4 md:right-8 z-[9999] w-full max-w-md bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border-2 transition-all flex flex-col gap-3"
+        :class="[
+          toast.type === 'success' ? 'border-[#EF972D] shadow-[#EF972D]/15' : '',
+          toast.type === 'warning' ? 'border-amber-500 shadow-amber-500/15' : '',
+          toast.type === 'error' ? 'border-red-500 shadow-red-500/15' : ''
+        ]"
+      >
+        <div class="flex items-start gap-3">
+          <!-- Icon / Thumbnail -->
+          <div v-if="toast.productInfo" class="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-200 shadow-sm">
+            <img :src="toast.productInfo.image" :alt="toast.productInfo.name" class="w-full h-full object-cover" />
+          </div>
+          <div 
+            v-else 
+            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold"
+            :class="[
+              toast.type === 'success' ? 'bg-[#EF972D]' : '',
+              toast.type === 'warning' ? 'bg-amber-500' : '',
+              toast.type === 'error' ? 'bg-red-500' : ''
+            ]"
+          >
+            <span class="material-symbols-outlined text-2xl">
+              {{ toast.type === 'success' ? 'shopping_bag' : toast.type === 'warning' ? 'warning' : 'error' }}
+            </span>
+          </div>
+
+          <!-- Content -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span 
+                class="text-xs font-black uppercase tracking-wider block"
+                :class="[
+                  toast.type === 'success' ? 'text-[#EF972D]' : '',
+                  toast.type === 'warning' ? 'text-amber-600' : '',
+                  toast.type === 'error' ? 'text-red-600' : ''
+                ]"
+              >
+                {{ toast.title }}
+              </span>
+              <button @click="toast.show = false" class="text-gray-400 hover:text-gray-600 cursor-pointer">
+                <span class="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+            <p class="text-xs font-bold text-gray-800 mt-0.5 leading-snug line-clamp-2">
+              {{ toast.message }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Action Buttons for Cart Add -->
+        <div v-if="toast.type === 'success'" class="flex gap-2 pt-2 border-t border-gray-100">
+          <RouterLink 
+            to="/cart" 
+            @click="toast.show = false"
+            class="flex-1 py-2 bg-[#EF972D] hover:bg-[#d87f1d] text-white text-center font-bold text-xs uppercase rounded-xl shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-sm">shopping_cart</span>
+            XEM GIỎ HÀNG
+          </RouterLink>
+          <button 
+            @click="toast.show = false" 
+            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer"
+          >
+            TIẾP TỤC MUA
+          </button>
+        </div>
+      </div>
+    </Transition>
   </main>
 </template>
 

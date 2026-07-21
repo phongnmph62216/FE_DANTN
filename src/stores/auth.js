@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { useCartStore } from './cart'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -20,6 +21,11 @@ export const useAuthStore = defineStore('auth', {
         const userData = response.data
         this.user = userData
         localStorage.setItem('auth_user', JSON.stringify(userData))
+
+        // Synchronize cart state for newly logged in user
+        const cartStore = useCartStore()
+        cartStore.loadCart()
+
         return userData
       } catch (error) {
         const msg = error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại.'
@@ -37,6 +43,10 @@ export const useAuthStore = defineStore('auth', {
     logout() {
       this.user = null
       localStorage.removeItem('auth_user')
+
+      // Switch back to guest cart upon logout
+      const cartStore = useCartStore()
+      cartStore.loadCart()
     }
   }
 })

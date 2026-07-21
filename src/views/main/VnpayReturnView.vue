@@ -2,10 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '@/services/api'
-
 import { formatCurrency } from '@/utils/format'
+import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
+const cartStore = useCartStore()
 
 const isLoading = ref(true)
 const paymentResult = ref(null)
@@ -24,7 +25,7 @@ onMounted(async () => {
 
     // Xóa giỏ hàng nếu thanh toán thành công
     if (isSuccess.value) {
-      localStorage.removeItem('bee_cart')
+      cartStore.clearCart()
     }
   } catch (error) {
     console.error('Error verifying payment:', error)

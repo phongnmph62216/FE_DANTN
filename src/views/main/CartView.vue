@@ -1,32 +1,35 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { formatCurrency } from '@/utils/format'
+import { useCartStore } from '@/stores/cart'
 
-const cartItems = ref([])
+const cartStore = useCartStore()
 
-const loadCart = () => {
-  cartItems.value = JSON.parse(localStorage.getItem('bee_cart') || '[]')
-}
+const cartItems = computed(() => cartStore.items)
 
-const saveCart = () => {
-  localStorage.setItem('bee_cart', JSON.stringify(cartItems.value))
+import { ref } from 'vue'
+
+const toast = ref({ show: false, message: '' })
+let toastTimer = null
+const showToast = (message) => {
+  toast.value = { show: true, message }
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toast.value.show = false }, 3000)
 }
 
 // Adjust quantity
 const increment = (item) => {
   if (item.quantity < item.stock) {
-    item.quantity++
-    saveCart()
+    cartStore.incrementQuantity(item.variantId)
   } else {
-    alert(`Số lượng tồn kho tối đa là ${item.stock}!`)
+    showToast(`Số lượng tồn kho tối đa của sản phẩm là ${item.stock}!`)
   }
 }
 
 const decrement = (item) => {
   if (item.quantity > 1) {
-    item.quantity--
-    saveCart()
+    cartStore.decrementQuantity(item.variantId)
   }
 }
 
@@ -36,27 +39,20 @@ const updateQuantity = (item, val) => {
     num = 1
   }
   if (item.stock && num > item.stock) {
-    alert(`Số lượng tồn kho tối đa là ${item.stock}!`)
+    showToast(`Số lượng tồn kho tối đa của sản phẩm là ${item.stock}!`)
     num = item.stock
   }
-  item.quantity = num
-  saveCart()
+  cartStore.updateQuantity(item.variantId, num)
 }
 
 // Delete item
 const deleteItem = (item) => {
-  cartItems.value = cartItems.value.filter(i => i.variantId !== item.variantId)
-  saveCart()
+  cartStore.removeItem(item.variantId)
 }
 
 // Calculations
-const totalPrice = computed(() => {
-  return cartItems.value.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-})
-
-const totalQuantity = computed(() => {
-  return cartItems.value.reduce((sum, item) => sum + item.quantity, 0)
-})
+const totalPrice = computed(() => cartStore.totalPrice)
+const totalQuantity = computed(() => cartStore.totalItems)
 
 // Free shipping calculations
 const shippingTarget = 399000
@@ -64,7 +60,7 @@ const shippingRemains = computed(() => Math.max(0, shippingTarget - totalPrice.v
 const freeShippingQualified = computed(() => totalPrice.value >= shippingTarget)
 
 onMounted(() => {
-  loadCart()
+  cartStore.loadCart()
 })
 </script>
 
@@ -233,6 +229,17 @@ onMounted(() => {
             Dùng mã giảm giá của <span class="font-bold text-on-surface">Bee Stylish</span> trong bước tiếp theo
           </p>
         </div>
+      </div>
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div 
+      v-if="toast.show" 
+      class="fixed bottom-6 right-6 z-[9999] pointer-events-none transform transition-all duration-300"
+    >
+      <div class="flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl bg-amber-500 text-white font-bold text-xs uppercase tracking-wider animate-bounce">
+        <span class="material-symbols-outlined text-xl">warning</span>
+        <span>{{ toast.message }}</span>
       </div>
     </div>
   </main>

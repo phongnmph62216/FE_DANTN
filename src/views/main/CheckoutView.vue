@@ -3,16 +3,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { useCartStore } from '@/stores/cart'
 import { formatCurrency as utilsFormatCurrency } from '@/utils/format'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const cartStore = useCartStore()
 
 // Cart items from local storage
-const cartItems = ref([])
+const cartItems = computed(() => cartStore.items)
 
 const loadCart = () => {
-  cartItems.value = JSON.parse(localStorage.getItem('bee_cart') || '[]')
+  cartStore.loadCart()
 }
 
 // Checkout Form Data
@@ -599,7 +601,7 @@ const confirmSubmitOrder = async () => {
         ghiChu: notes.value.trim()
       })
       checkoutStep.value = 'success'
-      localStorage.removeItem('bee_cart')
+      cartStore.clearCart()
     }
   } catch (error) {
     console.error('Checkout error:', error)

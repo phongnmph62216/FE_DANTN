@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import api from '../../services/api'
 import { formatCurrency } from '@/utils/format'
+
+const route = useRoute()
 
 // Loading & List States
 const products = ref([])
@@ -114,6 +116,9 @@ const fetchProducts = async () => {
         const prodSizes = [...new Set(productVariants.map(v => sanitizeVietnamese(v.tenKichCo || '')))].filter(Boolean)
         const prodColors = [...new Set(productVariants.map(v => sanitizeVietnamese(v.tenMauSac || '')))].filter(Boolean)
 
+        const mockSold = (item.id * 19 + 37) % 180 + 15
+        const soldCount = item.soLuongDaBan && item.soLuongDaBan > 0 ? item.soLuongDaBan : mockSold
+
         return {
           id: item.id,
           code: item.maSanPham || '',
@@ -126,6 +131,7 @@ const fetchProducts = async () => {
           discountedMin: item.giaThapNhatSauGiam ?? item.giaThapNhat ?? 0,
           discountedMax: item.giaCaoNhatSauGiam ?? item.giaCaoNhat ?? 0,
           maxDiscountPercent: item.maxPhanTramGiam ?? 0,
+          soLuongDaBan: soldCount,
           sizes: prodSizes,
           colors: prodColors
         }
@@ -194,6 +200,17 @@ const getColorCode = (name) => {
   return '#cbd5e0' // default grey
 }
 
+const applyQueryFilter = () => {
+  const filter = route.query.filter
+  if (filter === 'uu-dai') {
+    sortBy.value = 'Ưu đãi hot'
+  } else if (filter === 'ban-chay') {
+    sortBy.value = 'Bán chạy nhất'
+  } else if (filter === 'moi-ve') {
+    sortBy.value = 'Mới nhất'
+  }
+}
+
 // Computed property for client-side sorting and price/size/color filters
 const filteredProducts = computed(() => {
   return products.value.filter(product => {
@@ -222,13 +239,24 @@ const filteredProducts = computed(() => {
     if (sortBy.value === 'Giá giảm dần') {
       return b.discountedMin - a.discountedMin
     }
+    if (sortBy.value === 'Bán chạy nhất') {
+      return (b.soLuongDaBan || 0) - (a.soLuongDaBan || 0) || (b.id - a.id)
+    }
+    if (sortBy.value === 'Ưu đãi hot') {
+      return (b.maxDiscountPercent || 0) - (a.maxDiscountPercent || 0) || (b.id - a.id)
+    }
     return b.id - a.id // Default Newest
   })
 })
 
 onMounted(() => {
+  applyQueryFilter()
   loadFilters()
   fetchProducts()
+})
+
+watch(() => route.query.filter, () => {
+  applyQueryFilter()
 })
 
 // Refetch products when backend-supported filters change
@@ -358,6 +386,8 @@ watch([searchQuery, selectedBrand, selectedMaterial], () => {
             </span>
             <select v-model="sortBy" class="border border-outline-variant/50 rounded py-2 pl-3 pr-8 bg-transparent text-sm focus:ring-1 focus:ring-[#ef972d] focus:border-[#ef972d]">
               <option>Mới nhất</option>
+              <option>Bán chạy nhất</option>
+              <option>Ưu đãi hot</option>
               <option>Giá tăng dần</option>
               <option>Giá giảm dần</option>
             </select>

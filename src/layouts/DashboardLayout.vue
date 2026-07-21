@@ -17,7 +17,15 @@ const showToast = (message, type = 'success') => {
   }, 4000)
 }
 
+const showLogoutConfirmModal = ref(false)
+
 const handleLogout = () => {
+  showUserDropdown.value = false
+  showLogoutConfirmModal.value = true
+}
+
+const confirmLogout = () => {
+  showLogoutConfirmModal.value = false
   authStore.logout()
   router.push('/auth')
 }
@@ -119,6 +127,211 @@ const toggleNotificationsPanel = (event) => {
 
 const closeNotificationsPanel = () => {
   showNotificationsPanel.value = false
+}
+
+// User profile dropdown & Staff Profile Modal
+const showUserDropdown = ref(false)
+const showStaffProfileModal = ref(false)
+const staffActiveTab = ref('profile') // 'profile', 'password', 'settings'
+const isStaffProfileLoading = ref(false)
+const isStaffProfileSubmitting = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+const staffForm = ref({
+  id: null,
+  maNhanVien: '',
+  hoVaTen: '',
+  soDienThoai: '',
+  email: '',
+  cccd: '',
+  gioiTinh: 1,
+  ngaySinh: '',
+  diaChi: '',
+  idVaiTro: 1,
+  tenVaiTro: ''
+})
+
+const staffPasswordForm = ref({
+  newPassword: '',
+  confirmPassword: ''
+})
+
+const settingsForm = ref({
+  darkMode: false,
+  soundAlert: true,
+  language: 'vi'
+})
+
+watch(() => settingsForm.value.darkMode, (isDark) => {
+  if (isDark) {
+    document.documentElement.classList.add('dark')
+    localStorage.setItem('app_theme', 'dark')
+  } else {
+    document.documentElement.classList.remove('dark')
+    localStorage.setItem('app_theme', 'light')
+  }
+})
+
+onMounted(() => {
+  const savedTheme = localStorage.getItem('app_theme')
+  if (savedTheme === 'dark') {
+    settingsForm.value.darkMode = true
+    document.documentElement.classList.add('dark')
+  }
+})
+
+const toggleUserDropdown = (event) => {
+  event.stopPropagation()
+  showUserDropdown.value = !showUserDropdown.value
+  showNotificationsPanel.value = false
+}
+
+const closeAllDropdowns = () => {
+  showNotificationsPanel.value = false
+  showUserDropdown.value = false
+}
+
+const openStaffProfileModal = async (tab = 'profile') => {
+  staffActiveTab.value = tab
+  showUserDropdown.value = false
+  showStaffProfileModal.value = true
+
+  // Sync fallback info from authStore.user to prevent blank input fields
+  if (authStore.user) {
+    staffForm.value.hoVaTen = authStore.user.hoTen || authStore.user.hoVaTen || staffForm.value.hoVaTen || ''
+    staffForm.value.soDienThoai = authStore.user.sdt || authStore.user.soDienThoai || staffForm.value.soDienThoai || ''
+    staffForm.value.email = authStore.user.email || staffForm.value.email || ''
+    staffForm.value.tenVaiTro = authStore.user.tenVaiTro || (authStore.isManager ? 'Quản lý' : 'Nhân viên')
+    staffForm.value.idVaiTro = authStore.isManager ? 1 : 2
+  }
+
+  const userId = authStore.user?.id || authStore.user?.idNhanVien || authStore.user?.userId
+  if (!userId) return
+
+  if (!staffForm.value.id && tab === 'profile') {
+    isStaffProfileLoading.value = true
+  }
+
+  try {
+    const res = await api.get(`/api/v1/nhan-vien/${userId}`)
+    const data = res.data?.data || res.data
+    if (data) {
+      staffForm.value = {
+        id: data.id,
+        maNhanVien: data.maNhanVien || '',
+        hoVaTen: data.hoVaTen || authStore.user?.hoTen || '',
+        soDienThoai: data.soDienThoai || authStore.user?.sdt || '',
+        email: data.email || authStore.user?.email || '',
+        cccd: data.cccd || '',
+        gioiTinh: data.gioiTinh !== undefined && data.gioiTinh !== null ? data.gioiTinh : 1,
+        ngaySinh: data.ngaySinh || '',
+        diaChi: data.diaChi || '',
+        idVaiTro: data.vaiTro?.id || (authStore.isManager ? 1 : 2),
+        tenVaiTro: data.vaiTro?.tenVaiTro || (authStore.isManager ? 'Quản lý' : 'Nhân viên')
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load employee details:', err)
+  } finally {
+    isStaffProfileLoading.value = false
+  }
+}
+
+const saveStaffProfile = async () => {
+  if (!staffForm.value.hoVaTen || !staffForm.value.soDienThoai || !staffForm.value.email) {
+    showToast('Vui lòng nhập đầy đủ Họ tên, Số điện thoại và Email!', 'error')
+    return
+  }
+
+  const phoneRegex = /^(0[3|5|7|8|9])([0-9]{8})$/
+  if (!phoneRegex.test(staffForm.value.soDienThoai)) {
+    showToast('Số điện thoại không hợp lệ!', 'error')
+    return
+  }
+
+  isStaffProfileSubmitting.value = true
+  try {
+    const userId = staffForm.value.id || authStore.user?.id || authStore.user?.idNhanVien || authStore.user?.userId
+    const payload = {
+      idVaiTro: staffForm.value.idVaiTro,
+      hoVaTen: staffForm.value.hoVaTen,
+      soDienThoai: staffForm.value.soDienThoai,
+      email: staffForm.value.email,
+      cccd: staffForm.value.cccd,
+      gioiTinh: Number(staffForm.value.gioiTinh),
+      ngaySinh: staffForm.value.ngaySinh || null,
+      diaChi: staffForm.value.diaChi
+    }
+
+    if (userId) {
+      await api.put(`/api/v1/nhan-vien/${userId}`, payload)
+    }
+
+    if (authStore.user) {
+      authStore.user.hoTen = staffForm.value.hoVaTen
+      authStore.user.sdt = staffForm.value.soDienThoai
+      authStore.user.email = staffForm.value.email
+      localStorage.setItem('auth_user', JSON.stringify(authStore.user))
+    }
+
+    showToast('Cập nhật thông tin cá nhân thành công!', 'success')
+    showStaffProfileModal.value = false
+  } catch (err) {
+    console.error('Failed to update staff profile:', err)
+    const msg = err.response?.data?.message || 'Cập nhật thất bại!'
+    showToast(msg, 'error')
+  } finally {
+    isStaffProfileSubmitting.value = false
+  }
+}
+
+const saveStaffPassword = async () => {
+  if (!staffPasswordForm.value.newPassword) {
+    showToast('Vui lòng nhập mật khẩu mới!', 'error')
+    return
+  }
+
+  if (staffPasswordForm.value.newPassword.length < 6) {
+    showToast('Mật khẩu phải có ít nhất 6 ký tự!', 'error')
+    return
+  }
+
+  if (staffPasswordForm.value.newPassword !== staffPasswordForm.value.confirmPassword) {
+    showToast('Xác nhận mật khẩu mới không trùng khớp!', 'error')
+    return
+  }
+
+  isStaffProfileSubmitting.value = true
+  try {
+    const userId = staffForm.value.id || authStore.user?.id || authStore.user?.idNhanVien || authStore.user?.userId
+    const payload = {
+      idVaiTro: staffForm.value.idVaiTro || (authStore.isManager ? 1 : 2),
+      hoVaTen: staffForm.value.hoVaTen || authStore.user?.hoTen || 'Nhân viên',
+      soDienThoai: staffForm.value.soDienThoai || authStore.user?.sdt || '',
+      email: staffForm.value.email || authStore.user?.email || '',
+      cccd: staffForm.value.cccd || '',
+      gioiTinh: Number(staffForm.value.gioiTinh ?? 1),
+      ngaySinh: staffForm.value.ngaySinh || null,
+      diaChi: staffForm.value.diaChi || '',
+      matKhau: staffPasswordForm.value.newPassword
+    }
+
+    if (userId) {
+      await api.put(`/api/v1/nhan-vien/${userId}`, payload)
+    }
+
+    showToast('Đổi mật khẩu tài khoản thành công!', 'success')
+    staffPasswordForm.value.newPassword = ''
+    staffPasswordForm.value.confirmPassword = ''
+    showStaffProfileModal.value = false
+  } catch (err) {
+    console.error('Failed to change staff password:', err)
+    const msg = err.response?.data?.message || 'Đổi mật khẩu thất bại!'
+    showToast(msg, 'error')
+  } finally {
+    isStaffProfileSubmitting.value = false
+  }
 }
 
 const handleNotificationClick = async (notif) => {
@@ -234,7 +447,7 @@ let pollInterval = null
 onMounted(() => {
   notificationStore.fetchNotifications()
   pollInterval = setInterval(() => notificationStore.fetchNotifications(), 10000)
-  document.addEventListener('click', closeNotificationsPanel)
+  document.addEventListener('click', closeAllDropdowns)
   checkShiftStatus()
   notificationStore.connectWs()
   if (authStore.isLoggedIn && authStore.isAdminOrStaff) {
@@ -244,7 +457,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
-  document.removeEventListener('click', closeNotificationsPanel)
+  document.removeEventListener('click', closeAllDropdowns)
   stopClock()
   stopReminderTimer()
 })
@@ -797,23 +1010,76 @@ const getImageUrl = (url) => {
           </div>
           <div class="h-8 w-px bg-surface-container-high mx-2"></div>
           <!-- User Profile Dropdown -->
-          <div class="flex items-center gap-3 cursor-pointer hover:bg-surface-container-low p-1.5 pr-3 rounded-full transition-colors border border-transparent hover:border-surface-container-high">
-            <img
-              v-if="authStore.user?.anh"
-              alt="Admin User Profile"
-              class="w-8 h-8 rounded-full object-cover shadow-sm border border-surface-container"
-              :src="getImageUrl(authStore.user.anh)"
-            />
-            <div
-              v-else
-              class="w-8 h-8 rounded-full bg-[#EF972D] text-white flex items-center justify-center font-bold text-sm shadow-sm"
+          <div class="relative">
+            <button 
+              @click.stop="toggleUserDropdown"
+              class="flex items-center gap-3 cursor-pointer hover:bg-surface-container-low p-1.5 pr-3 rounded-full transition-colors border border-transparent hover:border-surface-container-high outline-none"
             >
-              {{ authStore.user?.hoTen ? authStore.user.hoTen.charAt(0).toUpperCase() : 'A' }}
+              <img
+                v-if="authStore.user?.anh"
+                alt="Admin User Profile"
+                class="w-8 h-8 rounded-full object-cover shadow-sm border border-surface-container"
+                :src="getImageUrl(authStore.user.anh)"
+              />
+              <div
+                v-else
+                class="w-8 h-8 rounded-full bg-[#EF972D] text-white flex items-center justify-center font-bold text-sm shadow-sm"
+              >
+                {{ authStore.user?.hoTen ? authStore.user.hoTen.charAt(0).toUpperCase() : 'A' }}
+              </div>
+              <div class="flex flex-col items-start">
+                <span class="font-label-sm text-on-surface leading-tight font-semibold">{{ authStore.user?.hoTen || 'Quản trị viên' }}</span>
+              </div>
+              <span class="material-symbols-outlined text-on-surface-variant text-[20px] transition-transform duration-200" :class="{ 'rotate-180': showUserDropdown }">keyboard_arrow_down</span>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div 
+              v-if="showUserDropdown"
+              @click.stop
+              class="absolute right-0 top-12 w-64 bg-surface border border-outline-variant/30 rounded-2xl shadow-2xl z-50 overflow-hidden text-on-surface py-2 divide-y divide-outline-variant/20"
+            >
+              <div class="px-4 py-3 bg-surface-variant/20">
+                <p class="font-bold text-sm text-on-surface line-clamp-1">{{ authStore.user?.hoTen || 'Quản trị viên' }}</p>
+                <p class="text-xs text-[#EF972D] font-semibold mt-0.5">{{ authStore.user?.tenVaiTro || (authStore.isManager ? 'Quản lý' : 'Nhân viên') }}</p>
+              </div>
+
+              <div class="py-1">
+                <button 
+                  @click.stop="openStaffProfileModal('profile')"
+                  class="w-full text-left px-4 py-2.5 hover:bg-surface-container-low transition-colors flex items-center gap-3 text-xs font-bold text-on-surface cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[#EF972D] text-lg">person</span>
+                  <span>👤 Thông tin cá nhân (Hồ sơ)</span>
+                </button>
+
+                <button 
+                  @click.stop="openStaffProfileModal('password')"
+                  class="w-full text-left px-4 py-2.5 hover:bg-surface-container-low transition-colors flex items-center gap-3 text-xs font-bold text-on-surface cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[#EF972D] text-lg">lock_reset</span>
+                  <span>🔑 Đổi mật khẩu</span>
+                </button>
+
+                <button 
+                  @click.stop="openStaffProfileModal('settings')"
+                  class="w-full text-left px-4 py-2.5 hover:bg-surface-container-low transition-colors flex items-center gap-3 text-xs font-bold text-on-surface cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-[#EF972D] text-lg">settings</span>
+                  <span>⚙️ Cài đặt</span>
+                </button>
+              </div>
+
+              <div class="pt-1">
+                <button 
+                  @click.stop="handleLogout"
+                  class="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 transition-colors flex items-center gap-3 text-xs font-bold cursor-pointer"
+                >
+                  <span class="material-symbols-outlined text-lg">logout</span>
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
             </div>
-            <div class="flex flex-col items-start">
-              <span class="font-label-sm text-on-surface leading-tight">{{ authStore.user?.hoTen || 'Quản trị viên' }}</span>
-            </div>
-            <span class="material-symbols-outlined text-on-surface-variant text-[20px]">keyboard_arrow_down</span>
           </div>
         </div>
       </header>
@@ -912,6 +1178,264 @@ const getImageUrl = (url) => {
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Staff Profile & Settings Modal -->
+    <div v-if="showStaffProfileModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div class="bg-surface border border-outline-variant/30 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-[#EF972D] text-white flex items-center justify-center font-bold text-lg uppercase shadow-sm">
+              {{ staffForm.hoVaTen ? staffForm.hoVaTen.charAt(0) : 'A' }}
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold text-on-surface uppercase tracking-tight">Hồ sơ & Cài đặt cá nhân</h3>
+              <p class="text-xs text-outline font-medium">Chức vụ: <span class="text-[#EF972D] font-bold">{{ staffForm.tenVaiTro }}</span></p>
+            </div>
+          </div>
+          <button @click="showStaffProfileModal = false" class="text-outline hover:text-on-surface transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-2xl">close</span>
+          </button>
+        </div>
+
+        <!-- Modal Navigation Tabs -->
+        <div class="flex gap-2 border-b border-outline-variant/20 pb-2">
+          <button 
+            @click="staffActiveTab = 'profile'"
+            class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+            :class="staffActiveTab === 'profile' ? 'bg-[#EF972D] text-white shadow-sm' : 'text-on-surface hover:bg-surface-variant/40'"
+          >
+            <span class="material-symbols-outlined text-sm">person</span>
+            👤 Thông tin cá nhân
+          </button>
+
+          <button 
+            @click="staffActiveTab = 'password'"
+            class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+            :class="staffActiveTab === 'password' ? 'bg-[#EF972D] text-white shadow-sm' : 'text-on-surface hover:bg-surface-variant/40'"
+          >
+            <span class="material-symbols-outlined text-sm">lock_reset</span>
+            🔑 Đổi mật khẩu
+          </button>
+
+          <button 
+            @click="staffActiveTab = 'settings'"
+            class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+            :class="staffActiveTab === 'settings' ? 'bg-[#EF972D] text-white shadow-sm' : 'text-on-surface hover:bg-surface-variant/40'"
+          >
+            <span class="material-symbols-outlined text-sm">settings</span>
+            ⚙️ Cài đặt
+          </button>
+        </div>
+
+        <!-- Loading state -->
+        <div v-if="isStaffProfileLoading" class="py-8 text-center text-outline">
+          <span class="material-symbols-outlined animate-spin text-2xl mb-1">progress_activity</span>
+          <p class="text-xs font-medium">Đang lấy thông tin nhân viên...</p>
+        </div>
+
+        <!-- Tab 1: Thông tin cá nhân -->
+        <div v-else-if="staffActiveTab === 'profile'" class="space-y-4">
+          <form @submit.prevent="saveStaffProfile" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-on-surface mb-1">Họ và tên <span class="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  v-model="staffForm.hoVaTen" 
+                  placeholder="Nhập họ và tên"
+                  required
+                  class="w-full px-3 py-2 bg-surface border border-outline-variant/50 focus:border-[#EF972D] rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-on-surface mb-1">Chức vụ / Phòng ban</label>
+                <input 
+                  type="text" 
+                  :value="staffForm.tenVaiTro" 
+                  disabled 
+                  class="w-full px-3 py-2 bg-surface-variant/30 border border-outline-variant/30 rounded-xl text-sm font-semibold text-outline cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-on-surface mb-1">Số điện thoại <span class="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  v-model="staffForm.soDienThoai" 
+                  placeholder="VD: 0901234567"
+                  required
+                  class="w-full px-3 py-2 bg-surface border border-outline-variant/50 focus:border-[#EF972D] rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-on-surface mb-1">Email <span class="text-red-500">*</span></label>
+                <input 
+                  type="email" 
+                  v-model="staffForm.email" 
+                  placeholder="VD: email@company.com"
+                  required
+                  class="w-full px-3 py-2 bg-surface border border-outline-variant/50 focus:border-[#EF972D] rounded-xl text-sm"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-on-surface mb-1">CCCD / CMND</label>
+                <input 
+                  type="text" 
+                  v-model="staffForm.cccd" 
+                  placeholder="Nhập số CCCD"
+                  class="w-full px-3 py-2 bg-surface border border-outline-variant/50 focus:border-[#EF972D] rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-on-surface mb-1">Giới tính</label>
+                <div class="flex items-center gap-4 py-2">
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+                    <input type="radio" v-model="staffForm.gioiTinh" :value="1" class="accent-[#EF972D]"/>
+                    <span>Nam</span>
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+                    <input type="radio" v-model="staffForm.gioiTinh" :value="0" class="accent-[#EF972D]"/>
+                    <span>Nữ</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-on-surface mb-1">Ngày sinh</label>
+                <input 
+                  type="date" 
+                  v-model="staffForm.ngaySinh" 
+                  class="w-full px-3 py-2 bg-surface border border-outline-variant/50 focus:border-[#EF972D] rounded-xl text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-on-surface mb-1">Địa chỉ thường trú</label>
+              <input 
+                type="text" 
+                v-model="staffForm.diaChi" 
+                placeholder="Nhập địa chỉ của nhân viên"
+                class="w-full px-3 py-2 bg-surface border border-outline-variant/50 focus:border-[#EF972D] rounded-xl text-sm"
+              />
+            </div>
+
+            <div class="pt-3 flex justify-end gap-3 border-t border-outline-variant/20">
+              <button 
+                type="button" 
+                @click="showStaffProfileModal = false" 
+                class="px-4 py-2 border border-outline-variant/50 text-on-surface-variant font-bold text-xs uppercase rounded-xl hover:bg-surface-variant/40 transition-colors"
+              >
+                HỦY BỎ
+              </button>
+              <button 
+                type="submit" 
+                :disabled="isStaffProfileSubmitting"
+                class="px-5 py-2 bg-[#EF972D] hover:bg-[#D87D15] text-white font-bold text-xs uppercase rounded-xl transition-all shadow-md inline-flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <span v-if="isStaffProfileSubmitting" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                <span v-else class="material-symbols-outlined text-sm">save</span>
+                LƯU THAY ĐỔI
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Tab 2: Đổi mật khẩu -->
+        <div v-else-if="staffActiveTab === 'password'" class="space-y-4">
+          <form @submit.prevent="saveStaffPassword" class="space-y-4 max-w-md">
+            <div>
+              <label class="block text-xs font-bold uppercase text-on-surface mb-1">Mật khẩu mới <span class="text-red-500">*</span></label>
+              <input 
+                type="password" 
+                v-model="staffPasswordForm.newPassword" 
+                placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                required
+                class="w-full px-3 py-2 bg-surface border border-outline-variant/50 focus:border-[#EF972D] rounded-xl text-sm"
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-on-surface mb-1">Xác nhận mật khẩu mới <span class="text-red-500">*</span></label>
+              <input 
+                type="password" 
+                v-model="staffPasswordForm.confirmPassword" 
+                placeholder="Nhập lại mật khẩu mới"
+                required
+                class="w-full px-3 py-2 bg-surface border border-outline-variant/50 focus:border-[#EF972D] rounded-xl text-sm"
+              />
+            </div>
+
+            <div class="pt-3 flex justify-end gap-3 border-t border-outline-variant/20">
+              <button 
+                type="button" 
+                @click="showStaffProfileModal = false" 
+                class="px-4 py-2 border border-outline-variant/50 text-on-surface-variant font-bold text-xs uppercase rounded-xl hover:bg-surface-variant/40 transition-colors"
+              >
+                HỦY BỎ
+              </button>
+              <button 
+                type="submit" 
+                :disabled="isStaffProfileSubmitting"
+                class="px-5 py-2 bg-[#EF972D] hover:bg-[#D87D15] text-white font-bold text-xs uppercase rounded-xl transition-all shadow-md inline-flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <span v-if="isStaffProfileSubmitting" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                <span v-else class="material-symbols-outlined text-sm">check_circle</span>
+                CẬP NHẬT MẬT KHẨU
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Tab 3: Cài đặt -->
+        <div v-else-if="staffActiveTab === 'settings'" class="space-y-4">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between p-3.5 border border-outline-variant/30 rounded-2xl">
+              <div>
+                <h4 class="text-xs font-bold text-on-surface uppercase">Giao diện (Dark / Light mode)</h4>
+                <p class="text-[11px] text-outline mt-0.5">Tùy chỉnh tông màu tối/sáng cho màn hình quản trị hệ thống.</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="settingsForm.darkMode" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#EF972D]"></div>
+              </label>
+            </div>
+
+            <div class="flex items-center justify-between p-3.5 border border-outline-variant/30 rounded-2xl">
+              <div>
+                <h4 class="text-xs font-bold text-on-surface uppercase">Âm thanh chuông thông báo</h4>
+                <p class="text-[11px] text-outline mt-0.5">Phát âm thanh thông báo khi có đơn hàng mới phát sinh.</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="settingsForm.soundAlert" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#EF972D]"></div>
+              </label>
+            </div>
+          </div>
+
+          <div class="pt-3 flex justify-end border-t border-outline-variant/20">
+            <button 
+              type="button" 
+              @click="showStaffProfileModal = false; showToast('Đã lưu tùy chỉnh cài đặt giao diện!', 'success')" 
+              class="px-5 py-2 bg-[#EF972D] hover:bg-[#D87D15] text-white font-bold text-xs uppercase rounded-xl transition-all shadow-md cursor-pointer"
+            >
+              HOÀN TẤT
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div 
       v-if="toast.show" 
@@ -931,6 +1455,34 @@ const getImageUrl = (url) => {
         <span class="leading-snug whitespace-pre-line pr-2">{{ toast.message }}</span>
       </div>
     </div>
+
+    <!-- Logout Confirmation Modal -->
+    <div v-if="showLogoutConfirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-gray-100 text-center space-y-4 transform transition-all animate-slide-up">
+        <div class="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto text-2xl shadow-inner">
+          <span class="material-symbols-outlined text-3xl">logout</span>
+        </div>
+        <div class="space-y-1">
+          <h3 class="text-base font-bold text-gray-900">Xác nhận đăng xuất</h3>
+          <p class="text-xs text-gray-500">Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không?</p>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button 
+            type="button"
+            @click="showLogoutConfirmModal = false"
+            class="flex-1 py-2.5 px-4 border border-gray-200 text-gray-700 font-bold text-xs uppercase rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            Hủy bỏ
+          </button>
+          <button 
+            type="button"
+            @click="confirmLogout"
+            class="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-md cursor-pointer"
+          >
+            Đăng xuất
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
