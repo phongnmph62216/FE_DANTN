@@ -34,6 +34,7 @@ const appliedVoucher = ref(null)
 const voucherError = ref('')
 const voucherSuccess = ref('')
 const orderNumber = ref('')
+const placedOrderTotalAmount = ref(0)
 const showConfirmModal = ref(false)
 
 // Payment steps: 'checkout', 'success'
@@ -594,6 +595,14 @@ const confirmSubmitOrder = async () => {
       const paymentUrl = response.data.paymentUrl
       window.location.href = paymentUrl
     } else {
+      // Fetch final total amount from backend before clearing cart
+      try {
+        const finalOrderRes = await api.get(`/api/v1/ban-hang/don-hang/${orderId}`)
+        placedOrderTotalAmount.value = finalOrderRes.data?.tongTienThanhToan ?? totalPayment.value
+      } catch (e) {
+        placedOrderTotalAmount.value = totalPayment.value
+      }
+
       // COD Flow: chốt thanh toán với tiền khách trả = 0, chuyển sang status 1 (Đã xác nhận)
       await api.post(`/api/v1/ban-hang/${orderId}/thanh-toan`, {
         tienMat: 0,
@@ -783,7 +792,7 @@ onMounted(async () => {
         <div>Số điện thoại: <span class="font-semibold text-on-surface">{{ phone }}</span></div>
         <div>Địa chỉ: <span class="font-semibold text-on-surface">{{ address }}, {{ selectedWard || '' }} {{ selectedDistrict }}, {{ selectedCity }}</span></div>
         <div>Phương thức: <span class="font-semibold text-on-surface">{{ paymentMethod === 'COD' ? 'Thanh toán khi nhận hàng (COD)' : 'Thanh toán online (VNPAY)' }}</span></div>
-        <div>Tổng thanh toán: <span class="font-semibold text-[#ef972d] font-bold text-base">{{ formatCurrency(totalPayment) }}</span></div>
+        <div>Tổng thanh toán: <span class="font-semibold text-[#ef972d] font-bold text-base">{{ formatCurrency(placedOrderTotalAmount || totalPayment) }}</span></div>
       </div>
 
       <div class="flex flex-col sm:flex-row gap-4 w-full justify-center mt-4">

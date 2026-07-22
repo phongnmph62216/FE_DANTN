@@ -26,16 +26,20 @@ export const useNotificationStore = defineStore('notification', {
         // 3. Map pending orders to virtual notifications (filtering out dismissed ones)
         const virtualNotifs = pendingOrders
           .filter(order => !this.dismissedVirtualOrderIds.includes(order.id))
-          .map(order => ({
-            id: `order-pending-${order.id}`,
-            tieuDe: `Đơn hàng chờ xác nhận`,
-            noiDung: `Đơn hàng ${order.maHoaDon} đang chờ xác nhận. Khách hàng: ${order.tenKhachHang || 'Khách lẻ'}. Tổng tiền: ${order.tongTien.toLocaleString('vi-VN')} đ`,
-            idHoaDon: order.id,
-            maHoaDon: order.maHoaDon,
-            trangThai: 0, // Always highlight as unread / pending
-            ngayTao: order.ngayTao,
-            isVirtualPendingOrder: true
-          }))
+          .map(order => {
+            const formattedMoney = order.tongTien ? Number(order.tongTien).toLocaleString('vi-VN') : '0'
+            const loaiDonText = order.loaiDon === 2 ? 'Online' : (order.loaiDon === 1 ? 'Giao hàng' : 'Tại quầy')
+            return {
+              id: `order-pending-${order.id}`,
+              tieuDe: `Đơn hàng chờ xác nhận (${loaiDonText})`,
+              noiDung: `Đơn hàng ${order.maHoaDon} (${loaiDonText}) đang chờ xác nhận. Khách hàng: ${order.tenKhachHang || 'Khách lẻ'}. Tổng tiền: ${formattedMoney} đ`,
+              idHoaDon: order.id,
+              maHoaDon: order.maHoaDon,
+              trangThai: 0, // Always highlight as unread / pending
+              ngayTao: order.ngayTao,
+              isVirtualPendingOrder: true
+            }
+          })
 
         // 4. Merge without duplicates (using idHoaDon to prevent double-display for the same order)
         const dbOrderIds = new Set(dbNotifs.filter(n => n.idHoaDon).map(n => Number(n.idHoaDon)))

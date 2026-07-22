@@ -88,8 +88,23 @@ const getCreatedDate = computed(() => {
 
 const getEmployeeName = computed(() => {
   if (!detail.value) return ''
-  return detail.value.nguoiTao || detail.value.tenNhanVien || detail.value.nhanVien || ''
+  return detail.value.tenNhanVien || detail.value.nguoiTao || detail.value.thongTinChung?.tenNhanVien || ''
 })
+
+const getCancelReason = computed(() => {
+  if (!detail.value) return 'Không có lý do cụ thể'
+  if (detail.value.lyDoHuy) return detail.value.lyDoHuy
+  if (detail.value.timelineTrangThai && detail.value.timelineTrangThai.length > 0) {
+    const cancelLog = detail.value.timelineTrangThai.find(l => l.ghiChu && l.ghiChu !== detail.value.ghiChu)
+    if (cancelLog && cancelLog.ghiChu) return cancelLog.ghiChu
+  }
+  return 'Không có lý do cụ thể'
+})
+
+const formatNguoiThucHien = (val) => {
+  if (!val || typeof val !== 'string' || val.includes('?')) return 'Hệ thống'
+  return val
+}
 
 // Customer Info
 const getCustomerName = computed(() => {
@@ -480,7 +495,7 @@ onMounted(() => {
           <div class="text-left">
             <h3 class="font-bold text-amber-800 text-base">Khách hàng yêu cầu hủy đơn hàng</h3>
             <p class="text-sm text-amber-700 mt-1">
-              Lý do: <span class="font-semibold italic">"{{ detail.ghiChu || 'Không có lý do cụ thể' }}"</span>
+              Lý do: <span class="font-semibold italic">"{{ getCancelReason }}"</span>
             </p>
           </div>
         </div>
@@ -891,7 +906,7 @@ onMounted(() => {
                 Thời gian: <span class="font-semibold text-on-surface">{{ formatDateTime(log.thoiGian || log.ngayTao || log.createdAt) }}</span>
               </span>
               <span class="text-xs text-on-surface-variant mt-0.5">
-                Người thực hiện: <span class="font-semibold text-on-surface">{{ log.nguoiThucHien || log.nguoiThaoTac || log.nguoiTao || 'Hệ thống' }}</span>
+                Người thực hiện: <span class="font-semibold text-on-surface">{{ formatNguoiThucHien(log.nguoiThucHien || log.nguoiThaoTac || log.nguoiTao) }}</span>
               </span>
               
               <!-- Remark box -->
