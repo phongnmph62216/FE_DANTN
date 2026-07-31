@@ -43,7 +43,7 @@ const fetchLogs = async () => {
       data = data.filter(log => log.tenNhanVienNhanCa === authStore.user.hoTen)
     }
     
-    logs.value = data
+    logs.value = data.sort((a, b) => b.id - a.id)
   } catch (error) {
     console.error('Error fetching accounting logs:', error)
     showToast('Lỗi khi tải lịch sử đối soát ca của bạn.', 'error')

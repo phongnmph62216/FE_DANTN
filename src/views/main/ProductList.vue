@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Html5Qrcode } from 'html5-qrcode'
+import JSZip from 'jszip'
 import api from '../../services/api'
 import { formatInputNumber, parseInputNumber, sortNewestAtTop } from '@/utils/format'
 
@@ -287,7 +288,7 @@ const handleToggle = (product) => {
 }
 
 const viewVariants = (product) => {
-  router.push({ path: '/products/variants', query: { search: product.code } })
+  router.push({ path: '/products/variants', query: { search: product.code, idSanPham: product.id } })
 }
 
 const addProduct = () => {
@@ -466,6 +467,53 @@ const handleModalImageUpload = async (e) => {
   }
 }
 
+const downloadBlobFile = async (blobData, fileName, mimeType = 'application/octet-stream') => {
+  try {
+    if (!blobData) {
+      showToast('Dữ liệu file không tồn tại!', 'error')
+      return
+    }
+
+    const blob = blobData instanceof Blob 
+      ? blobData 
+      : new Blob([blobData], { type: mimeType })
+
+    // Check if server returned a JSON error inside blob
+    if (blob.type === 'application/json' || (blob.size < 500 && blob.type !== mimeType)) {
+      try {
+        const text = await blob.text()
+        const json = JSON.parse(text)
+        if (json && (json.message || json.status)) {
+          showToast(`Lỗi từ máy chủ: ${json.message || json.status}`, 'error')
+          return
+        }
+      } catch (e) {
+        // Not a JSON error
+      }
+    }
+
+    const blobUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.style.display = 'none'
+    a.href = blobUrl
+    a.download = fileName
+    document.body.appendChild(a)
+    
+    // Trigger click synchronously
+    a.click()
+
+    setTimeout(() => {
+      if (document.body.contains(a)) {
+        document.body.removeChild(a)
+      }
+      window.URL.revokeObjectURL(blobUrl)
+    }, 10000)
+  } catch (err) {
+    console.error('downloadBlobFile error:', err)
+    showToast('Tải file về máy thất bại!', 'error')
+  }
+}
+
 const removeModalImage = () => {
   triggerConfirm(
     'Bạn có chắc chắn muốn gỡ bỏ ảnh đại diện hiện tại của sản phẩm?',
@@ -488,19 +536,20 @@ const exportExcel = async () => {
     async () => {
       try {
         isLoading.value = true
-        const params = {}
-        if (searchQuery.value.trim()) {
-          params.keyword = searchQuery.value.trim()
+        const params = {
+          keyword: searchQuery.value || null,
+          idThuongHieu: selectedBrand.value || null,
+          idDanhMuc: selectedCategory.value || null,
+          idChatLieu: selectedMaterial.value || null,
+          minPrice: null,
+          maxPrice: priceRangeValue.value
         }
-        if (selectedBrand.value) {
-          params.idThuongHieu = selectedBrand.value
+        if (selectedStatus.value === 'active') {
+          params.trangThai = 1
+        } else if (selectedStatus.value === 'inactive') {
+          params.trangThai = 0
         }
-        if (selectedMaterial.value) {
-          params.idChatLieu = selectedMaterial.value
-        }
-        if (selectedStatus.value !== 'all') {
-          params.trangThai = selectedStatus.value === 'active' ? 1 : 0
-        }
+
         if (selectedProductIds.value.length > 0) {
           params.ids = selectedProductIds.value.join(',')
         }
@@ -510,17 +559,11 @@ const exportExcel = async () => {
           responseType: 'blob'
         })
 
-        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = selectedProductIds.value.length > 0
+        const fileName = selectedProductIds.value.length > 0
           ? `danh_sach_san_pham_da_chon_${new Date().toISOString().slice(0, 10)}.xlsx`
           : `danh_sach_san_pham_${new Date().toISOString().slice(0, 10)}.xlsx`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
+
+        downloadBlobFile(response.data, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         showToast('Tải file Excel thành công!', 'success')
       } catch (err) {
         console.error('Failed to export product Excel:', err)
@@ -547,11 +590,6 @@ const downloadProductQr = async (product) => {
       try {
         const response = await fetch(qrUrl)
         const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `QR_${code}.png`
-        document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
         window.URL.revokeObjectURL(url)
@@ -567,41 +605,94 @@ const downloadProductQr = async (product) => {
 }
 
 const downloadSelectedQrs = async () => {
-  if (selectedProductIds.value.length === 0) return
+  if (!selectedProductIds.value || selectedProductIds.value.length === 0) {
+    showToast('Vui lòng chọn ít nhất 1 sản phẩm để tải mã QR!', 'warning')
+    return
+  }
+
+  const count = selectedProductIds.value.length
   
   triggerConfirm(
-    `Bạn có chắc chắn muốn tải hàng loạt ${selectedProductIds.value.length} mã QR đã chọn không?`,
+    `Bạn có chắc chắn muốn tải ${count} mã QR sản phẩm đã chọn về máy không?`,
     async () => {
-      const selectedProducts = products.value.filter(p => selectedProductIds.value.includes(p.id))
+      const selectedProducts = products.value.filter(p => 
+        selectedProductIds.value.some(id => String(id) === String(p.id))
+      )
       
-      for (let i = 0; i < selectedProducts.length; i++) {
-        const product = selectedProducts[i]
-        const code = product.code
-        if (!code || code === 'N/A') continue
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${code}`
-        
-        try {
+      if (selectedProducts.length === 0) {
+        showToast('Không tìm thấy sản phẩm đã chọn để tải mã QR!', 'error')
+        return
+      }
+
+      isLoading.value = true
+      showToast(`Đang xử lý tải mã QR cho ${selectedProducts.length} sản phẩm...`, 'info')
+
+      try {
+        if (selectedProducts.length === 1) {
+          const product = selectedProducts[0]
+          const code = product.code || product.maSanPham || product.ma
+          if (!code || code === 'N/A') return
+          
+          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(code)}`
           const res = await fetch(qrUrl)
           const blob = await res.blob()
-          const url = window.URL.createObjectURL(blob)
-          
+          const blobUrl = window.URL.createObjectURL(blob)
           const link = document.createElement('a')
-          link.href = url
+          link.href = blobUrl
           link.download = `QRCode_${code}.png`
           document.body.appendChild(link)
           link.click()
           document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-          
-          await new Promise(resolve => setTimeout(resolve, 250))
-        } catch (err) {
-          console.error(`Failed to download QR for ${code}:`, err)
-          window.open(qrUrl, '_blank')
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000)
+
+          showToast(`Tải thành công mã QR sản phẩm ${code}!`, 'success')
+        } else {
+          const zip = new JSZip()
+          let successCount = 0
+
+          for (let i = 0; i < selectedProducts.length; i++) {
+            const product = selectedProducts[i]
+            const code = product.code || product.maSanPham || product.ma
+            if (!code || code === 'N/A') continue
+            
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(code)}`
+            try {
+              const res = await fetch(qrUrl)
+              if (res.ok) {
+                const blob = await res.blob()
+                zip.file(`QRCode_${code}.png`, blob)
+                successCount++
+              }
+            } catch (err) {
+              console.warn(`Failed fetching QR for ${code}:`, err)
+            }
+          }
+
+          if (successCount === 0) {
+            showToast('Không thể kết nối đến hệ thống tạo mã QR!', 'error')
+            return
+          }
+
+          const zipBlob = await zip.generateAsync({ type: 'blob' })
+          const zipUrl = window.URL.createObjectURL(zipBlob)
+          const link = document.createElement('a')
+          link.href = zipUrl
+          link.download = `Bo_Anh_Ma_QR_${selectedProducts.length}_san_pham.zip`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          setTimeout(() => window.URL.revokeObjectURL(zipUrl), 2000)
+
+          showToast(`Đã tải thành công bộ nén chứa đủ ${successCount}/${selectedProducts.length} file ảnh QR về máy!`, 'success')
         }
+      } catch (err) {
+        console.error('Error generating QR package:', err)
+        showToast('Tải mã QR sản phẩm thất bại. Vui lòng thử lại!', 'error')
+      } finally {
+        isLoading.value = false
       }
-      showToast('Đã tải hoàn tất các mã QR được chọn!', 'success')
     },
-    'Tải hàng loạt mã QR'
+    'Tải mã QR về máy'
   )
 }
 

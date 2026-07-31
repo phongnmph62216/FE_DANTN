@@ -725,14 +725,13 @@ const saveCustomer = async () => {
 
         <!-- Form fields -->
         <div class="space-y-4 font-body-md text-body-md">
-          <!-- Mã KH (Disabled) -->
-          <div class="space-y-1">
+          <!-- Mã KH (Chỉ hiển thị khi chỉnh sửa) -->
+          <div v-if="isEdit" class="space-y-1">
             <label class="block text-sm font-semibold text-on-surface-variant">Mã KH</label>
             <input 
               type="text" 
               v-model="form.maKhachHang" 
               class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-on-surface-variant cursor-not-allowed focus:outline-none"
-              placeholder="Hệ thống tự động phát sinh"
               readonly
             />
           </div>

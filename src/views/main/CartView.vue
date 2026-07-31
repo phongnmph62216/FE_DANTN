@@ -59,8 +59,14 @@ const shippingTarget = 399000
 const shippingRemains = computed(() => Math.max(0, shippingTarget - totalPrice.value))
 const freeShippingQualified = computed(() => totalPrice.value >= shippingTarget)
 
-onMounted(() => {
+import api from '@/services/api'
+
+onMounted(async () => {
   cartStore.loadCart()
+  const res = await cartStore.validateAndUpdatePrices(api)
+  if (res && res.priceChanged) {
+    showToast(res.message)
+  }
 })
 </script>
 

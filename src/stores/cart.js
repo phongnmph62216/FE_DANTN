@@ -88,6 +88,54 @@ export const useCartStore = defineStore('cart', {
       this.items = []
       const key = getCartKey()
       localStorage.removeItem(key)
+    },
+    async validateAndUpdatePrices(apiInstance) {
+      this.loadCart()
+      if (!this.items || this.items.length === 0) return { priceChanged: false }
+
+      let priceChanged = false
+      const updatedItems = [...this.items]
+
+      try {
+        for (let i = 0; i < updatedItems.length; i++) {
+          const item = updatedItems[i]
+          const vId = item.variantId || item.id
+          if (!vId) continue
+
+          try {
+            const res = await apiInstance.get(`/api/v1/chi-tiet-san-pham/${vId}`)
+            if (res && res.data) {
+              const latestPrice = res.data.giaBan ?? res.data.donGia ?? item.price
+              const latestOriginalPrice = res.data.giaBanDau ?? res.data.giaGoc ?? latestPrice
+              const latestStock = res.data.soLuong ?? item.stock
+
+              if (latestPrice !== undefined && Number(item.price) !== Number(latestPrice)) {
+                priceChanged = true
+                updatedItems[i].price = Number(latestPrice)
+                updatedItems[i].originalPrice = Number(latestOriginalPrice)
+              }
+              if (latestStock !== undefined) {
+                updatedItems[i].stock = latestStock
+              }
+            }
+          } catch (err) {
+            console.warn(`Could not verify price for variant ${vId}:`, err)
+          }
+        }
+
+        if (priceChanged) {
+          this.items = updatedItems
+          this.saveCart()
+          return {
+            priceChanged: true,
+            message: 'Giá của một số sản phẩm trong giỏ hàng đã được tự động cập nhật theo giá mới nhất từ hệ thống!'
+          }
+        }
+      } catch (err) {
+        console.error('Error validating cart prices:', err)
+      }
+
+      return { priceChanged: false }
     }
   }
 })

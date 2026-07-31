@@ -343,214 +343,201 @@ onMounted(async () => {
       </h2>
       
       <form @submit.prevent="handleSave">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-          <!-- Left Column -->
-          <div class="space-y-stack-md">
-            <!-- Mã phiếu -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">Mã phiếu giảm giá</label>
-              <div class="relative rounded-md shadow-sm border border-gray-300 bg-white">
-                <input
-                  v-model="maPhieu"
-                  :disabled="isEdit"
-                  :class="isEdit ? 'bg-gray-50 text-gray-500 cursor-not-allowed border-gray-200' : 'bg-transparent border-gray-300'"
-                  class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange placeholder-gray-400"
-                  placeholder="Nhập mã phiếu"
-                  type="text"
-                />
-              </div>
-            </div>
-
-            <!-- Kiểu áp dụng -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
-                Kiểu áp dụng <span class="text-red-500 font-bold">*</span>
-              </label>
-              <div class="flex items-center space-x-6 mt-2">
-                <label class="flex items-center cursor-pointer select-none">
-                  <input
-                    v-model="kieuApDung"
-                    :value="0"
-                    class="h-4 w-4 text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
-                    name="apply_type"
-                    type="radio"
-                  />
-                  <span class="ml-2 font-body-md text-body-md text-gray-700">Tất cả</span>
-                </label>
-                <label class="flex items-center cursor-pointer select-none">
-                  <input
-                    v-model="kieuApDung"
-                    :value="1"
-                    class="h-4 w-4 text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
-                    name="apply_type"
-                    type="radio"
-                  />
-                  <span class="ml-2 font-body-md text-body-md text-gray-700">Cá nhân</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Giá trị giảm -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
-                Giá trị giảm <span class="text-red-500 font-bold">*</span>
-              </label>
-              <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center">
-                <input
-                  v-if="loaiGiam === 1"
-                  :value="formatInputNumber(giaTriGiam)"
-                  @input="giaTriGiam = parseInputNumber($event.target.value)"
-                  class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
-                  placeholder="Nhập giá trị giảm"
-                  type="text"
-                />
-                <input
-                  v-else
-                  v-model="giaTriGiam"
-                  class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
-                  placeholder="Nhập giá trị giảm"
-                  type="number"
-                  min="0"
-                  step="any"
-                />
-                <span class="px-3 py-2 font-body-md text-gray-500 border-l border-gray-200 bg-gray-50 rounded-r-md min-w-[44px] text-center font-medium">
-                  {{ loaiGiam === 0 ? '%' : 'đ' }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Điều kiện -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
-                Điều kiện đơn hàng <span class="text-red-500 font-bold">*</span>
-              </label>
-              <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center">
-                <input
-                  :value="formatInputNumber(donToiThieu)"
-                  @input="donToiThieu = parseInputNumber($event.target.value)"
-                  class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
-                  placeholder="Nhập giá trị đơn hàng tối thiểu"
-                  type="text"
-                />
-                <span class="px-3 py-2 font-body-md text-gray-500 border-l border-gray-200 bg-gray-50 rounded-r-md min-w-[44px] text-center font-medium">
-                  đ
-                </span>
-              </div>
-            </div>
-
-            <!-- Ngày bắt đầu -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
-                Ngày bắt đầu <span class="text-red-500 font-bold">*</span>
-              </label>
-              <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center pr-3">
-                <input
-                  v-model="ngayBatDau"
-                  class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange bg-transparent text-gray-700 cursor-pointer"
-                  type="datetime-local"
-                />
-              </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Row 1: Mã phiếu (chỉ khi edit) & Tên phiếu -->
+          <div v-if="isEdit" class="col-span-1">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">Mã phiếu giảm giá</label>
+            <div class="relative rounded-md shadow-sm border border-gray-300 bg-white">
+              <input
+                v-model="maPhieu"
+                disabled
+                class="block w-full rounded-md border-0 py-2 px-3 text-body-md bg-gray-50 text-gray-500 cursor-not-allowed border-gray-200"
+                type="text"
+              />
             </div>
           </div>
 
-          <!-- Right Column -->
-          <div class="space-y-stack-md">
-            <!-- Tên phiếu -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
-                Tên phiếu giảm giá <span class="text-red-500 font-bold">*</span>
-              </label>
-              <div class="relative rounded-md shadow-sm border border-gray-300 bg-white">
-                <input
-                  v-model="tenPhieu"
-                  class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange bg-transparent placeholder-gray-400"
-                  placeholder="Nhập tên phiếu giảm giá"
-                  type="text"
-                />
-              </div>
+          <div :class="isEdit ? 'col-span-1' : 'col-span-1 md:col-span-2'">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
+              Tên phiếu giảm giá <span class="text-red-500 font-bold">*</span>
+            </label>
+            <div class="relative rounded-md shadow-sm border border-gray-300 bg-white">
+              <input
+                v-model="tenPhieu"
+                class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange bg-transparent placeholder-gray-400"
+                placeholder="Nhập tên phiếu giảm giá"
+                type="text"
+              />
             </div>
+          </div>
 
-            <!-- Loại ưu đãi -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
-                Loại ưu đãi <span class="text-red-500 font-bold">*</span>
-              </label>
-              <div class="flex items-center space-x-6 mt-2">
-                <label class="flex items-center cursor-pointer select-none">
-                  <input
-                    v-model="loaiGiam"
-                    :value="0"
-                    class="h-4 w-4 text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
-                    name="reward_type"
-                    type="radio"
-                  />
-                  <span class="ml-2 font-body-md text-body-md text-gray-700">Giảm %</span>
-                </label>
-                <label class="flex items-center cursor-pointer select-none">
-                  <input
-                    v-model="loaiGiam"
-                    :value="1"
-                    class="h-4 w-4 text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
-                    name="reward_type"
-                    type="radio"
-                  />
-                  <span class="ml-2 font-body-md text-body-md text-gray-700">Giảm tiền</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Giá trị tối đa -->
-            <div>
-              <label class="block font-label-sm text-label-sm mb-stack-sm font-semibold" :class="loaiGiam === 1 ? 'text-gray-400' : 'text-gray-600'">
-                Giá trị tối đa <span v-if="loaiGiam === 0" class="text-red-500 font-bold">*</span>
-              </label>
-              <div class="relative rounded-md shadow-sm border flex items-center bg-white" :class="loaiGiam === 1 ? 'border-gray-200 bg-gray-50/50' : 'border-gray-300'">
+          <!-- Row 2: Kiểu áp dụng & Loại ưu đãi -->
+          <div class="col-span-1">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
+              Kiểu áp dụng <span class="text-red-500 font-bold">*</span>
+            </label>
+            <div class="flex items-center space-x-6 mt-2 h-[42px]">
+              <label class="flex items-center cursor-pointer select-none">
                 <input
-                  :value="formatInputNumber(giamToiDa)"
-                  @input="giamToiDa = parseInputNumber($event.target.value)"
-                  :disabled="loaiGiam === 1"
-                  class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent disabled:text-gray-400 disabled:cursor-not-allowed"
-                  placeholder="Nhập giá trị giảm tối đa"
-                  type="text"
+                  v-model="kieuApDung"
+                  :value="0"
+                  class="h-4 w-4 text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
+                  name="apply_type"
+                  type="radio"
                 />
-                <span class="px-3 py-2 font-body-md border-l rounded-r-md min-w-[44px] text-center font-medium" :class="loaiGiam === 1 ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-500'">
-                  đ
-                </span>
-              </div>
-            </div>
-
-            <!-- Số lượng -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
-                Số lượng <span class="text-red-500 font-bold">*</span>
+                <span class="ml-2 font-body-md text-body-md text-gray-700">Tất cả</span>
               </label>
-              <div
-                class="relative rounded-md shadow-sm border bg-white"
-                :class="kieuApDung === 1 ? 'border-gray-200 bg-gray-50/50' : 'border-gray-300'"
-              >
+              <label class="flex items-center cursor-pointer select-none">
                 <input
-                  v-model="soLuong"
-                  :disabled="kieuApDung === 1"
-                  class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange bg-transparent disabled:text-gray-400 disabled:cursor-not-allowed"
-                  type="number"
-                  min="0"
-                  placeholder="Nhập số lượng"
+                  v-model="kieuApDung"
+                  :value="1"
+                  class="h-4 w-4 text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
+                  name="apply_type"
+                  type="radio"
                 />
-              </div>
-            </div>
-
-            <!-- Ngày kết thúc -->
-            <div>
-              <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
-                Ngày kết thúc <span class="text-red-500 font-bold">*</span>
+                <span class="ml-2 font-body-md text-body-md text-gray-700">Cá nhân</span>
               </label>
-              <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center pr-3">
+            </div>
+          </div>
+
+          <div class="col-span-1">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
+              Loại ưu đãi <span class="text-red-500 font-bold">*</span>
+            </label>
+            <div class="flex items-center space-x-6 mt-2 h-[42px]">
+              <label class="flex items-center cursor-pointer select-none">
                 <input
-                  v-model="ngayKetThuc"
-                  class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange bg-transparent text-gray-700 cursor-pointer"
-                  type="datetime-local"
+                  v-model="loaiGiam"
+                  :value="0"
+                  class="h-4 w-4 text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
+                  name="reward_type"
+                  type="radio"
                 />
-              </div>
+                <span class="ml-2 font-body-md text-body-md text-gray-700">Giảm %</span>
+              </label>
+              <label class="flex items-center cursor-pointer select-none">
+                <input
+                  v-model="loaiGiam"
+                  :value="1"
+                  class="h-4 w-4 text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
+                  name="reward_type"
+                  type="radio"
+                />
+                <span class="ml-2 font-body-md text-body-md text-gray-700">Giảm tiền</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Row 3: Giá trị giảm & Giá trị tối đa -->
+          <div class="col-span-1">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
+              Giá trị giảm <span class="text-red-500 font-bold">*</span>
+            </label>
+            <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center">
+              <input
+                v-if="loaiGiam === 1"
+                :value="formatInputNumber(giaTriGiam)"
+                @input="giaTriGiam = parseInputNumber($event.target.value)"
+                class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
+                placeholder="Nhập giá trị giảm"
+                type="text"
+              />
+              <input
+                v-else
+                v-model="giaTriGiam"
+                class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
+                placeholder="Nhập giá trị giảm"
+                type="number"
+                min="0"
+                step="any"
+              />
+              <span class="px-3 py-2 font-body-md text-gray-500 border-l border-gray-200 bg-gray-50 rounded-r-md min-w-[44px] text-center font-medium">
+                {{ loaiGiam === 0 ? '%' : 'đ' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="col-span-1">
+            <label class="block font-label-sm text-label-sm mb-stack-sm font-semibold" :class="loaiGiam === 1 ? 'text-gray-400' : 'text-gray-600'">
+              Giá trị tối đa <span v-if="loaiGiam === 0" class="text-red-500 font-bold">*</span>
+            </label>
+            <div class="relative rounded-md shadow-sm border flex items-center bg-white" :class="loaiGiam === 1 ? 'border-gray-200 bg-gray-50/50' : 'border-gray-300'">
+              <input
+                :value="formatInputNumber(giamToiDa)"
+                @input="giamToiDa = parseInputNumber($event.target.value)"
+                :disabled="loaiGiam === 1"
+                class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent disabled:text-gray-400 disabled:cursor-not-allowed"
+                placeholder="Nhập giá trị giảm tối đa"
+                type="text"
+              />
+              <span class="px-3 py-2 font-body-md border-l rounded-r-md min-w-[44px] text-center font-medium" :class="loaiGiam === 1 ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-500'">
+                đ
+              </span>
+            </div>
+          </div>
+
+          <!-- Row 4: Điều kiện đơn hàng & Số lượng -->
+          <div class="col-span-1">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
+              Điều kiện đơn hàng <span class="text-red-500 font-bold">*</span>
+            </label>
+            <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center">
+              <input
+                :value="formatInputNumber(donToiThieu)"
+                @input="donToiThieu = parseInputNumber($event.target.value)"
+                class="block w-full rounded-l-md border-0 py-2 px-3 text-body-md focus:ring-0 focus:outline-none bg-transparent"
+                placeholder="Nhập giá trị đơn hàng tối thiểu"
+                type="text"
+              />
+              <span class="px-3 py-2 font-body-md text-gray-500 border-l border-gray-200 bg-gray-50 rounded-r-md min-w-[44px] text-center font-medium">
+                đ
+              </span>
+            </div>
+          </div>
+
+          <div class="col-span-1">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
+              Số lượng <span class="text-red-500 font-bold">*</span>
+            </label>
+            <div
+              class="relative rounded-md shadow-sm border bg-white"
+              :class="kieuApDung === 1 ? 'border-gray-200 bg-gray-50/50' : 'border-gray-300'"
+            >
+              <input
+                v-model="soLuong"
+                :disabled="kieuApDung === 1"
+                class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange bg-transparent disabled:text-gray-400 disabled:cursor-not-allowed"
+                type="number"
+                min="0"
+                placeholder="Nhập số lượng"
+              />
+            </div>
+          </div>
+
+          <!-- Row 5: Ngày bắt đầu & Ngày kết thúc -->
+          <div class="col-span-1">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
+              Ngày bắt đầu <span class="text-red-500 font-bold">*</span>
+            </label>
+            <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center pr-3">
+              <input
+                v-model="ngayBatDau"
+                class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange bg-transparent text-gray-700 cursor-pointer"
+                type="datetime-local"
+              />
+            </div>
+          </div>
+
+          <div class="col-span-1">
+            <label class="block font-label-sm text-label-sm text-gray-600 mb-stack-sm font-semibold">
+              Ngày kết thúc <span class="text-red-500 font-bold">*</span>
+            </label>
+            <div class="relative rounded-md shadow-sm border border-gray-300 bg-white flex items-center pr-3">
+              <input
+                v-model="ngayKetThuc"
+                class="block w-full rounded-md border-0 py-2 px-3 text-body-md focus:ring-1 focus:ring-brand-orange focus:border-brand-orange bg-transparent text-gray-700 cursor-pointer"
+                type="datetime-local"
+              />
             </div>
           </div>
         </div>

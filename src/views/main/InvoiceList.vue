@@ -397,10 +397,10 @@ onMounted(() => {
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Mã hóa đơn</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Nhân viên tạo</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Khách hàng</th>
+              <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">SĐT</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Ngày tạo</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Tổng tiền</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">Loại đơn</th>
-              <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap">SĐT</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap text-center">Trạng thái</th>
               <th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase whitespace-nowrap text-center w-28">Hành động</th>
             </tr>
@@ -418,10 +418,13 @@ onMounted(() => {
                 {{ item.maHoaDon || item.ma || '-' }}
               </td>
               <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface">
-                {{ item.tenNhanVien || item.nhanVien || '' }}
+                {{ item.tenNhanVien || item.nhanVien || (item.loaiDon === 2 ? 'Website' : 'Hệ thống') }}
               </td>
               <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface">
                 {{ item.tenKhachHang || item.khachHang || 'Khách lẻ' }}
+              </td>
+              <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface">
+                {{ item.soDienThoaiKhachHang || item.sdtKhachHang || item.soDienThoai || '-' }}
               </td>
               <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface-variant">
                 {{ $format.dateTime(item.ngayTao) }}
@@ -448,9 +451,6 @@ onMounted(() => {
                 >
                   Online
                 </span>
-              </td>
-              <td class="py-3.5 px-4 font-body-md text-body-md text-on-surface">
-                {{ item.soDienThoaiKhachHang || item.sdtKhachHang || item.soDienThoai || '-' }}
               </td>
               <td class="py-3.5 px-4 text-center">
                 <span

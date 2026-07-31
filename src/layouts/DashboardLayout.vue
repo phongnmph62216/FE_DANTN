@@ -462,8 +462,11 @@ onUnmounted(() => {
   stopReminderTimer()
 })
 
-watch(() => route.path, () => {
+watch(() => route.path, (newPath) => {
   checkShiftStatus()
+  if (newPath.startsWith('/orders') || newPath.startsWith('/invoices')) {
+    menuStates.value.invoices = true
+  }
 })
 
 // State to expand/collapse sidebar
@@ -471,6 +474,7 @@ const sidebarExpanded = ref(true)
 
 // Menu expand/collapse states for collapsible sections
 const menuStates = ref({
+  invoices: route.path.startsWith('/orders') || route.path.startsWith('/invoices'),
   products: true,
   attributes: false,
   discounts: false,
@@ -571,32 +575,41 @@ const getImageUrl = (url) => {
           <div class="h-px w-8 mx-auto bg-surface-variant/20 my-3" v-show="!sidebarExpanded"></div>
         </li>
 
-        <!-- Quản lý đơn hàng -->
+        <!-- Quản lý hóa đơn (Collapsible containing Đơn hàng & Hóa đơn) -->
         <li>
-          <RouterLink
-            to="/orders"
+          <button
             :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
-            class="flex items-center gap-3 py-3 rounded-lg font-bold transition-all shadow-sm"
-            :style="isActiveRoute('/orders') || route.path.startsWith('/orders') ? 'background-image: linear-gradient(to right, #FFB74D, #EF972D); color: #ffffff;' : 'color: rgba(211, 228, 254, 0.8);'"
-            :class-active="isActiveRoute('/orders') || route.path.startsWith('/orders') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
+            @click="toggleMenu('invoices')"
+            class="w-full flex items-center justify-between py-3 rounded-lg transition-colors group cursor-pointer"
+            :style="isActiveRoute('/orders') || route.path.startsWith('/orders') || isActiveRoute('/invoices') || route.path.startsWith('/invoices') ? 'color: #EF972D; font-weight: 700;' : 'color: rgba(211, 228, 254, 0.8);'"
+            :class-active="isActiveRoute('/orders') || route.path.startsWith('/orders') || isActiveRoute('/invoices') || route.path.startsWith('/invoices') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
           >
-            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">shopping_bag</span>
-            <span class="font-body-md text-body-md font-semibold whitespace-nowrap" v-show="sidebarExpanded">Quản lý đơn hàng</span>
-          </RouterLink>
-        </li>
-
-        <!-- Quản lý hóa đơn -->
-        <li>
-          <RouterLink
-            to="/invoices"
-            :class="sidebarExpanded ? 'px-4' : 'px-0 justify-center'"
-            class="flex items-center gap-3 py-3 rounded-lg font-bold transition-all shadow-sm"
-            :style="isActiveRoute('/invoices') || route.path.startsWith('/invoices') ? 'background-image: linear-gradient(to right, #FFB74D, #EF972D); color: #ffffff;' : 'color: rgba(211, 228, 254, 0.8);'"
-            :class-active="isActiveRoute('/invoices') || route.path.startsWith('/invoices') ? '' : 'hover:bg-surface-variant/10 hover:text-surface-bright'"
-          >
-            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">receipt_long</span>
-            <span class="font-body-md text-body-md font-semibold whitespace-nowrap" v-show="sidebarExpanded">Quản lý hóa đơn</span>
-          </RouterLink>
+            <div :class="!sidebarExpanded && 'justify-center w-full'" class="flex items-center gap-3">
+              <span class="material-symbols-outlined group-hover:scale-110 transition-transform">receipt_long</span>
+              <span class="font-body-md text-body-md whitespace-nowrap" v-show="sidebarExpanded">Quản lý hóa đơn</span>
+            </div>
+            <span
+              :class="menuStates.invoices ? 'rotate-180' : ''"
+              class="material-symbols-outlined text-[18px] transition-transform duration-200"
+              v-show="sidebarExpanded"
+            >expand_more</span>
+          </button>
+          <div class="pl-11 pr-4 py-1 flex flex-col gap-1" v-show="menuStates.invoices && sidebarExpanded">
+            <RouterLink
+              to="/orders"
+              class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+              :class="isActiveRoute('/orders') || route.path.startsWith('/orders') ? 'text-[#EF972D] font-semibold bg-surface-variant/10' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+            >
+              Đơn hàng
+            </RouterLink>
+            <RouterLink
+              to="/invoices"
+              class="py-2 rounded-md px-3 font-body-md text-sm transition-colors block"
+              :class="isActiveRoute('/invoices') || route.path.startsWith('/invoices') ? 'text-[#EF972D] font-semibold bg-surface-variant/10' : 'text-surface-variant/60 hover:text-surface-bright hover:bg-surface-variant/5'"
+            >
+              Hóa đơn
+            </RouterLink>
+          </div>
         </li>
 
         <!-- Quản lý sản phẩm (Collapsible) -->

@@ -425,7 +425,7 @@ onMounted(() => {
             <template v-if="selectedVariant">
               <div v-if="selectedVariant.stock > 0" class="flex items-center gap-1.5 text-emerald-700 text-xs bg-emerald-100 font-bold py-1 px-3 rounded-full">
                 <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-                Còn hàng (Tồn kho: {{ selectedVariant.stock }})
+                Còn hàng
               </div>
               <div v-else class="flex items-center gap-1.5 text-red-700 text-xs bg-red-100 font-bold py-1 px-3 rounded-full">
                 <span class="w-2 h-2 rounded-full bg-red-600"></span>

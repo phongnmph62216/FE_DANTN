@@ -45,7 +45,7 @@ const fetchVouchers = async () => {
   if (!idGiaoCa) return
   try {
     const res = await api.get(`/api/v1/giao-ca/phieu-chi/${idGiaoCa}`)
-    vouchersList.value = res.data || []
+    vouchersList.value = (res.data || []).sort((a, b) => b.id - a.id)
   } catch (error) {
     console.error('Error fetching vouchers:', error)
   }

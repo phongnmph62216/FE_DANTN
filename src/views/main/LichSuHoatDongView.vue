@@ -37,7 +37,7 @@ const fetchActivityLogs = async () => {
         toDate: toDate.value
       }
     })
-    activityLogs.value = res.data || []
+    activityLogs.value = (res.data || []).sort((a, b) => b.id - a.id)
   } catch (error) {
     console.error('Error fetching activity logs:', error)
   } finally {

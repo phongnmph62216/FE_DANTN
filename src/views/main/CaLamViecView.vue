@@ -89,7 +89,7 @@ const fetchShifts = async () => {
     ])
 
     if (response.data) {
-      shifts.value = response.data
+      shifts.value = Array.isArray(response.data) ? response.data.sort((a, b) => b.id - a.id) : response.data
     }
     if (responseGiaoCa.data) {
       todayGiaoCaList.value = responseGiaoCa.data

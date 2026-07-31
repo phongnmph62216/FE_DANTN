@@ -551,8 +551,13 @@ const downloadTemplate = async () => {
     link.setAttribute('download', 'mau_import_lich_lam_viec.xlsx')
     document.body.appendChild(link)
     link.click()
-    link.remove()
-    window.URL.revokeObjectURL(url)
+    
+    setTimeout(() => {
+      if (document.body.contains(link)) {
+        link.remove()
+      }
+      window.URL.revokeObjectURL(url)
+    }, 10000)
     
     showToast('Tải tệp biểu mẫu thành công!', 'success')
   } catch (error) {

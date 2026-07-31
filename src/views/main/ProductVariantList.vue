@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Html5Qrcode } from 'html5-qrcode'
+import JSZip from 'jszip'
 import api from '../../services/api'
 import { formatCurrency as formatPrice, formatInputNumber, parseInputNumber } from '@/utils/format'
 
@@ -35,6 +36,7 @@ const handleConfirm = async () => {
 }
 
 const searchQuery = ref(route.query.search || '')
+const idSanPham = ref(route.query.idSanPham || '')
 const selectedColor = ref('')
 const selectedSize = ref('')
 const selectedStatus = ref('')
@@ -174,20 +176,45 @@ const loadFilterOptions = async () => {
 }
 
 const productStatusMap = ref({})
+const productNameMap = ref({})
 
-const fetchProductStatuses = async () => {
+const fetchProductMap = async () => {
   try {
     const res = await api.get('/api/v1/san-pham', { params: { size: 1000 } })
     if (res.data && res.data.content) {
       const statuses = {}
+      const names = {}
       res.data.content.forEach(p => {
-        statuses[p.maSanPham] = p.trangThai === 1
+        const code = p.maSanPham || p.ma
+        if (code) {
+          statuses[code] = p.trangThai === 1
+          names[code] = p.tenSanPham || p.ten || ''
+        }
+        if (p.id) {
+          names[p.id] = p.tenSanPham || p.ten || ''
+        }
       })
       productStatusMap.value = statuses
+      productNameMap.value = names
     }
   } catch (err) {
-    console.warn('Failed to fetch product statuses:', err)
+    console.warn('Failed to fetch product map:', err)
   }
+}
+
+const resolveProductName = (item) => {
+  if (item.tenSanPham && item.tenSanPham !== 'Sản phẩm') return item.tenSanPham
+  if (item.sanPham && item.sanPham.tenSanPham) return item.sanPham.tenSanPham
+  if (item.tenChiTietSanPham) return item.tenChiTietSanPham
+  
+  const code = item.maSanPham || item.productCode
+  if (code && productNameMap.value[code]) {
+    return productNameMap.value[code]
+  }
+  if (item.idSanPham && productNameMap.value[item.idSanPham]) {
+    return productNameMap.value[item.idSanPham]
+  }
+  return item.ten || '—'
 }
 
 const isParentProductInactive = (productCode) => {
@@ -200,10 +227,13 @@ const fetchVariants = async (page = 0) => {
   currentPage.value = page
   selectedVariantIds.value = [] // Clear selection when fetching new dataset
   try {
-    await fetchProductStatuses()
+    await fetchProductMap()
     const params = {
       page: page,
       size: pageSize.value,
+    }
+    if (idSanPham.value) {
+      params.idSanPham = idSanPham.value
     }
     if (searchQuery.value.trim()) {
       params.keyword = searchQuery.value.trim()
@@ -224,10 +254,22 @@ const fetchVariants = async (page = 0) => {
     const data = res.data
 
     if (data && Array.isArray(data.content)) {
-      allVariants.value = data.content.map(item => ({
+      let rawList = data.content
+      const q = searchQuery.value.trim().toLowerCase()
+      
+      // If search query matches a product code format (e.g. SP002), filter out false matches from other products
+      if (q) {
+        const hasExactProductCodeMatch = rawList.some(item => (item.maSanPham || '').toLowerCase() === q)
+        if (hasExactProductCodeMatch) {
+          rawList = rawList.filter(item => (item.maSanPham || '').toLowerCase() === q)
+        }
+      }
+
+      allVariants.value = rawList.map(item => ({
         id: item.id,
         productCode: item.maSanPham || 'N/A',
         variantCode: item.maChiTietSanPham || item.ma || 'N/A',
+        productName: resolveProductName(item),
         size: sanitizeVietnamese(item.tenKichCo || item.tenKichThuoc || ''),
         color: sanitizeVietnamese(item.tenMauSac || ''),
         stock: item.soLuongTon ?? 0,
@@ -239,7 +281,7 @@ const fetchVariants = async (page = 0) => {
         ngayBatDau: item.ngayBatDau,
         ngayKetThuc: item.ngayKetThuc,
         trangThaiDotGiamGia: item.trangThaiDotGiamGia,
-      }))
+      })).sort((a, b) => b.id - a.id)
       totalPages.value = data.totalPages || 1
       totalElements.value = data.totalElements || 0
       // Update priceMax based on actual data
@@ -425,17 +467,11 @@ const exportExcel = async () => {
           responseType: 'blob'
         })
 
-        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = selectedVariantIds.value.length > 0
+        const fileName = selectedVariantIds.value.length > 0
           ? `danh_sach_bien_the_da_chon_${new Date().toISOString().slice(0, 10)}.xlsx`
           : `danh_sach_bien_the_${new Date().toISOString().slice(0, 10)}.xlsx`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
+
+        downloadBlobFile(response.data, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         showToast('Tải file Excel biến thể thành công!', 'success')
       } catch (err) {
         console.error('Failed to export Excel:', err)
@@ -448,41 +484,153 @@ const exportExcel = async () => {
   )
 }
 
-const downloadSelectedQrs = async () => {
-  if (selectedVariantIds.value.length === 0) return
-  
-  triggerConfirm(
-    `Bạn có chắc chắn muốn tải hàng loạt ${selectedVariantIds.value.length} mã QR biến thể đã chọn không?`,
-    async () => {
-      const selectedVariants = filteredVariants.value.filter(v => selectedVariantIds.value.includes(v.id))
-      
-      for (let i = 0; i < selectedVariants.length; i++) {
-        const variant = selectedVariants[i]
-        const variantCode = variant.variantCode
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${variantCode}`
-        
-        try {
-          const res = await fetch(qrUrl)
-          const blob = await res.blob()
-          const url = window.URL.createObjectURL(blob)
-          
-          const link = document.createElement('a')
-          link.href = url
-          link.download = `QRCode_${variantCode}.png`
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-          
-          await new Promise(resolve => setTimeout(resolve, 250))
-        } catch (err) {
-          console.error(`Failed to download QR for ${variantCode}:`, err)
-          window.open(qrUrl, '_blank')
+const downloadBlobFile = async (blobData, fileName, mimeType = 'application/octet-stream') => {
+  try {
+    if (!blobData) {
+      showToast('Dữ liệu file không tồn tại!', 'error')
+      return
+    }
+
+    const blob = blobData instanceof Blob 
+      ? blobData 
+      : new Blob([blobData], { type: mimeType })
+
+    // Check if server returned a JSON error inside blob
+    if (blob.type === 'application/json' || (blob.size < 500 && blob.type !== mimeType)) {
+      try {
+        const text = await blob.text()
+        const json = JSON.parse(text)
+        if (json && (json.message || json.status)) {
+          showToast(`Lỗi từ máy chủ: ${json.message || json.status}`, 'error')
+          return
         }
+      } catch (e) {
+        // Not a JSON error
       }
-      showToast('Đã tải hoàn tất các mã QR được chọn!', 'success')
+    }
+
+    const blobUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.style.display = 'none'
+    a.href = blobUrl
+    a.download = fileName
+    document.body.appendChild(a)
+    
+    // Trigger click synchronously
+    a.click()
+
+    setTimeout(() => {
+      if (document.body.contains(a)) {
+        document.body.removeChild(a)
+      }
+      window.URL.revokeObjectURL(blobUrl)
+    }, 10000)
+  } catch (err) {
+    console.error('downloadBlobFile error:', err)
+    showToast('Tải file về máy thất bại!', 'error')
+  }
+}
+
+const batchQrList = ref([])
+const showBatchQrModal = ref(false)
+const currentZipBlob = ref(null)
+
+const downloadCurrentBatchZip = () => {
+  if (currentZipBlob.value) {
+    downloadBlobFile(currentZipBlob.value, `Bo_Anh_Ma_QR_${batchQrList.value.length}_bien_the.zip`, 'application/zip')
+    showToast('Đang tải bộ file nén ZIP mã QR về máy...', 'success')
+  }
+}
+
+const downloadSingleQrItem = (item) => {
+  if (item.blob) {
+    downloadBlobFile(item.blob, `QRCode_${item.code}.png`, 'image/png')
+    showToast(`Đã tải file ảnh mã QR cho ${item.code}!`, 'success')
+  }
+}
+
+const downloadSelectedQrs = async () => {
+  if (!selectedVariantIds.value || selectedVariantIds.value.length === 0) {
+    showToast('Vui lòng chọn ít nhất 1 biến thể sản phẩm để tải mã QR!', 'warning')
+    return
+  }
+  
+  const count = selectedVariantIds.value.length
+
+  triggerConfirm(
+    `Bạn có chắc chắn muốn tải ${count} mã QR biến thể đã chọn về máy không?`,
+    async () => {
+      const selectedVariants = allVariants.value.filter(v => 
+        selectedVariantIds.value.some(id => String(id) === String(v.id))
+      )
+
+      if (selectedVariants.length === 0) {
+        showToast('Không tìm thấy biến thể đã chọn để tải mã QR!', 'error')
+        return
+      }
+
+      isLoading.value = true
+      showToast(`Đang tạo mã QR cho ${selectedVariants.length} sản phẩm...`, 'info')
+
+      try {
+        const zip = new JSZip()
+        let successCount = 0
+        const preparedList = []
+
+        for (let i = 0; i < selectedVariants.length; i++) {
+          const variant = selectedVariants[i]
+          const variantCode = variant.variantCode || variant.maChiTietSanPham || variant.ma || `BT_${variant.id}`
+          if (!variantCode || variantCode === 'N/A') continue
+
+          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(variantCode)}`
+          
+          try {
+            const res = await fetch(qrUrl)
+            if (res.ok) {
+              const blob = await res.blob()
+              zip.file(`QRCode_${variantCode}.png`, blob)
+              preparedList.push({
+                code: variantCode,
+                name: variant.productName || variantCode,
+                size: variant.size,
+                color: variant.color,
+                price: variant.salePrice,
+                qrUrl: qrUrl,
+                blob: blob
+              })
+              successCount++
+            }
+          } catch (err) {
+            console.warn(`Fetch blob failed for ${variantCode}:`, err)
+          }
+        }
+
+        if (successCount === 0) {
+          showToast('Không thể kết nối đến máy chủ tạo mã QR!', 'error')
+          return
+        }
+
+        batchQrList.value = preparedList
+        
+        // Generate ZIP Blob with explicit application/zip MIME type
+        const zipBlob = await zip.generateAsync({ type: 'blob', mimeType: 'application/zip' })
+        currentZipBlob.value = zipBlob
+        const zipFileName = `Bo_Anh_Ma_QR_${selectedVariants.length}_bien_the.zip`
+        
+        // Trigger automatic download
+        downloadBlobFile(zipBlob, zipFileName, 'application/zip')
+
+        // Show batch preview modal so user can view, print, or download anytime!
+        showBatchQrModal.value = true
+        showToast(`Đã chuẩn bị xong ${successCount}/${selectedVariants.length} mã QR!`, 'success')
+      } catch (err) {
+        console.error('Error downloading QR package:', err)
+        showToast('Tải mã QR thất bại. Vui lòng thử lại!', 'error')
+      } finally {
+        isLoading.value = false
+      }
     },
-    'Tải hàng loạt mã QR'
+    'Tải mã QR về máy'
   )
 }
 
@@ -592,14 +740,7 @@ const downloadQrCode = async () => {
       try {
         const response = await fetch(qrUrl)
         const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `QR_${variantCode}.png`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
+        downloadBlobFile(blob, `QR_${variantCode}.png`, 'image/png')
         showToast(`Đang tải QR mã ${variantCode} về máy!`, 'success')
       } catch (err) {
         console.error('Failed to download QR code blob, opening in new tab instead:', err)
@@ -651,6 +792,12 @@ const updateVariantDetail = async () => {
     'Cập nhật biến thể'
   )
 }
+
+watch(searchQuery, (newVal) => {
+  if (route.query.search && newVal.trim() !== route.query.search.trim()) {
+    idSanPham.value = ''
+  }
+})
 
 // Watch filters and refetch
 watch([searchQuery, selectedColor, selectedSize, selectedStatus], () => {
@@ -814,6 +961,7 @@ onMounted(() => {
               <th class="p-4 whitespace-nowrap">Ảnh</th>
               <th class="p-4 whitespace-nowrap">Mã SP</th>
               <th class="p-4 whitespace-nowrap">Mã CTSP</th>
+              <th class="p-4 whitespace-nowrap">Tên sản phẩm</th>
               <th class="p-4 whitespace-nowrap">Kích cỡ</th>
               <th class="p-4 whitespace-nowrap">Màu sắc</th>
               <th class="p-4 whitespace-nowrap">SL tồn</th>
@@ -825,7 +973,7 @@ onMounted(() => {
           </thead>
           <tbody class="font-body-md text-body-md text-on-surface divide-y divide-outline-variant">
             <tr v-if="isLoading">
-              <td colspan="12" class="p-8 text-center text-on-surface-variant">
+              <td colspan="13" class="p-8 text-center text-on-surface-variant">
                 <div class="flex flex-col items-center gap-2 justify-center">
                   <span class="animate-spin material-symbols-outlined text-3xl text-[#EF972D]">progress_activity</span>
                   Đang tải danh sách biến thể...
@@ -833,7 +981,7 @@ onMounted(() => {
               </td>
             </tr>
             <tr v-else-if="filteredVariants.length === 0">
-              <td colspan="12" class="p-8 text-center text-on-surface-variant">
+              <td colspan="13" class="p-8 text-center text-on-surface-variant">
                 Không tìm thấy biến thể nào phù hợp bộ lọc.
               </td>
             </tr>
@@ -877,6 +1025,7 @@ onMounted(() => {
               </td>
               <td class="p-4 font-semibold text-primary">{{ variant.productCode }}</td>
               <td class="p-4">{{ variant.variantCode }}</td>
+              <td class="p-4 font-medium text-on-surface">{{ variant.productName }}</td>
               <td class="p-4">{{ variant.size }}</td>
               <td class="p-4">{{ variant.color }}</td>
               <td class="p-4">{{ variant.stock }}</td>
@@ -1254,6 +1403,75 @@ onMounted(() => {
         >
           Xác nhận
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Batch QR Preview & Download Modal -->
+  <div v-if="showBatchQrModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 animate-scale-up text-slate-800">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[#ef972d] text-2xl">qr_code_2</span>
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">Bộ Mã QR Đã Chọn ({{ batchQrList.length }} biến thể)</h3>
+            <p class="text-xs text-slate-500">Tải về máy dưới dạng File Nén ZIP hoặc tải trực tiếp từng ảnh PNG</p>
+          </div>
+        </div>
+        <button @click="showBatchQrModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <!-- Modal Body: Grid of QR Cards -->
+      <div class="p-6 flex-grow overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 bg-slate-50/50">
+        <div 
+          v-for="item in batchQrList" 
+          :key="item.code" 
+          class="bg-white p-3 rounded-xl border border-slate-200 flex flex-col items-center text-center gap-2 shadow-xs hover:shadow-md transition-all group"
+        >
+          <div class="w-32 h-32 bg-white p-1 rounded border border-slate-100 flex items-center justify-center">
+            <img :src="item.qrUrl" :alt="item.code" class="w-full h-full object-contain"/>
+          </div>
+          <div class="w-full">
+            <div class="font-bold text-xs text-[#ef972d] font-mono uppercase">{{ item.code }}</div>
+            <div class="text-[11px] font-semibold text-slate-700 line-clamp-1 mt-0.5">{{ item.name }}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Size {{ item.size }} | {{ item.color }}</div>
+            <div class="font-bold text-xs text-slate-800 mt-1">{{ formatPrice(item.price) }}</div>
+          </div>
+          <button 
+            type="button" 
+            @click="downloadSingleQrItem(item)" 
+            class="w-full mt-1 bg-slate-100 hover:bg-[#ef972d] hover:text-white text-slate-700 py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-xs">download</span> Tải PNG
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row gap-3 justify-between items-center bg-white rounded-b-2xl">
+        <span class="text-xs text-slate-500 italic">
+          💡 Bạn có thể tải nguyên bộ file nén ZIP hoặc bấm nút "Tải PNG" bên dưới từng mã QR.
+        </span>
+        <div class="flex gap-3">
+          <button 
+            type="button" 
+            @click="showBatchQrModal = false" 
+            class="px-4 py-2 border border-slate-300 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            Đóng
+          </button>
+          <button 
+            type="button" 
+            @click="downloadCurrentBatchZip" 
+            class="px-5 py-2 bg-[#ef972d] hover:bg-[#d88523] text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 uppercase tracking-wider"
+          >
+            <span class="material-symbols-outlined text-sm">folder_zip</span>
+            Tải File Nén ZIP ({{ batchQrList.length }} mã)
+          </button>
+        </div>
       </div>
     </div>
   </div>

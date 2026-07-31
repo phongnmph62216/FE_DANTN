@@ -103,12 +103,19 @@ export function sortNewestAtTop(type, list) {
   try {
     const key = `newly_added_${type}`;
     const newlyAdded = JSON.parse(sessionStorage.getItem(key) || '[]');
-    if (newlyAdded.length === 0) return list;
+    
+    // Sort comparator helper (newest ID first)
+    const compareByIdDesc = (a, b) => (Number(b.id) || 0) - (Number(a.id) || 0);
+
+    if (newlyAdded.length === 0) {
+      return [...list].sort(compareByIdDesc);
+    }
 
     const newItems = list.filter(item => newlyAdded.includes(item.id));
     const oldItems = list.filter(item => !newlyAdded.includes(item.id));
 
-    newItems.sort((a, b) => b.id - a.id);
+    newItems.sort(compareByIdDesc);
+    oldItems.sort(compareByIdDesc);
 
     return [...newItems, ...oldItems];
   } catch (e) {

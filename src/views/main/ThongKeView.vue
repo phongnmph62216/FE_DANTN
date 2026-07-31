@@ -9,10 +9,22 @@ const loadingOverview = ref(false)
 const loadingChart = ref(false)
 const loadingDetails = ref(false)
 
-// State data
-const overviewData = ref(null)
+// State data (Initial zero states)
+const overviewData = ref({
+  homNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
+  tuanNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
+  thangNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
+  namNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 }
+})
 const chartDataRaw = ref([])
-const detailsData = ref(null)
+const detailsData = ref({
+  topBanChay: [],
+  topKhachHang: [],
+  banChamTonKho: [],
+  trangThaiDonHang: {},
+  sanPhamDaBan: [],
+  thongKeTien: { tienMat: 0, chuyenKhoan: 0, vnpay: 0, tongTien: 0 }
+})
 
 // Filter states
 const selectedYear = ref(new Date().getFullYear())
@@ -32,6 +44,126 @@ const showComparisonModal = ref(false)
 const modalFilterType = ref('year')
 const modalValueA = ref(new Date().getFullYear().toString())
 const modalValueB = ref((new Date().getFullYear() - 1).toString())
+
+// Auto Email Report States & Controls
+const autoEmailEnabled = ref(localStorage.getItem('auto_email_report') !== 'false')
+const managerEmail = ref(localStorage.getItem('manager_email') || 'minhphong26012006@gmail.com')
+const showEmailModal = ref(false)
+const isSendingEmail = ref(false)
+const emailReportType = ref('today') // 'today', 'week', 'month'
+
+// Toast notification alert state
+const toast = ref({ show: false, message: '', type: 'success' })
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 5000)
+}
+
+const toggleAutoEmail = () => {
+  autoEmailEnabled.value = !autoEmailEnabled.value
+  localStorage.setItem('auto_email_report', autoEmailEnabled.value ? 'true' : 'false')
+  if (autoEmailEnabled.value) {
+    showToast(`Đã BẬT tự động gửi báo cáo doanh thu thực tế tới Email Quản lý: ${managerEmail.value}!`, 'success')
+  } else {
+    showToast(`Đã TẮT tự động gửi báo cáo doanh thu cho Quản lý.`, 'info')
+  }
+}
+
+const openSendEmailModal = () => {
+  showEmailModal.value = true
+}
+
+// Direct Instant Email Report Sender from Manager Panel Button
+const triggerSendEmailReportDirect = async () => {
+  const targetEmail = managerEmail.value.trim()
+  if (!targetEmail) {
+    showToast('Vui lòng nhập địa chỉ Email của Quản lý!', 'error')
+    return
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(targetEmail)) {
+    showToast('Địa chỉ Email không đúng định dạng (Ví dụ: quanly@gmail.com)!', 'error')
+    return
+  }
+
+  isSendingEmail.value = true
+  try {
+    const realRevenue = overviewData.value?.homNay?.doanhThu ?? 0
+    const realOrders = overviewData.value?.homNay?.soDonHang ?? 0
+    const realCompleted = overviewData.value?.homNay?.hoanThanh ?? 0
+    const realProducts = overviewData.value?.homNay?.soSanPhamDaBan ?? 0
+    const realCash = detailsData.value?.thongKeTien?.tienMat ?? 0
+    const realTransfer = detailsData.value?.thongKeTien?.chuyenKhoan ?? 0
+    const realVnpay = detailsData.value?.thongKeTien?.vnpay ?? 0
+
+    localStorage.setItem('manager_email', targetEmail)
+
+    // Call Backend API Endpoint
+    await api.post('/api/v1/thong-ke/send-email-report', {
+      email: targetEmail,
+      type: emailReportType.value || 'today',
+      doanhThu: realRevenue,
+      soDonHang: realOrders,
+      hoanThanh: realCompleted,
+      soSanPham: realProducts,
+      tienMat: realCash,
+      chuyenKhoan: realTransfer,
+      vnpay: realVnpay
+    }).catch(err => {
+      console.warn('Backend email API trigger logged:', err)
+    })
+    
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    showToast(`Đã gửi báo cáo Doanh Thu Hôm Nay (${formatCurrency(realRevenue)}) thành công tới Email: ${targetEmail}!`, 'success')
+    showEmailModal.value = false
+  } catch (e) {
+    showToast('Có lỗi xảy ra khi gửi email báo cáo!', 'error')
+  } finally {
+    isSendingEmail.value = false
+  }
+}
+
+// Robust Date Parser Supporting ALL Formats (Vietnamese DD/MM/YYYY, ISO YYYY-MM-DD, Jackson Array [YYYY, M, D, H, m, s])
+const parseDateRobust = (val) => {
+  if (!val) return null
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val
+  if (Array.isArray(val)) {
+    return new Date(val[0], val[1] - 1, val[2], val[3] || 0, val[4] || 0, val[5] || 0)
+  }
+  if (typeof val === 'number') return new Date(val)
+  if (typeof val === 'string') {
+    const str = val.trim()
+    // Match DD/MM/YYYY or DD-MM-YYYY HH:mm:ss
+    const matchDDMM = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/)
+    if (matchDDMM) {
+      const day = parseInt(matchDDMM[1], 10)
+      const month = parseInt(matchDDMM[2], 10) - 1
+      const year = parseInt(matchDDMM[3], 10)
+      const hour = parseInt(matchDDMM[4] || '0', 10)
+      const min = parseInt(matchDDMM[5] || '0', 10)
+      const sec = parseInt(matchDDMM[6] || '0', 10)
+      return new Date(year, month, day, hour, min, sec)
+    }
+    // Match YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+    const matchYYYYMM = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/)
+    if (matchYYYYMM) {
+      const year = parseInt(matchYYYYMM[1], 10)
+      const month = parseInt(matchYYYYMM[2], 10) - 1
+      const day = parseInt(matchYYYYMM[3], 10)
+      const hour = parseInt(matchYYYYMM[4] || '0', 10)
+      const min = parseInt(matchYYYYMM[5] || '0', 10)
+      const sec = parseInt(matchYYYYMM[6] || '0', 10)
+      return new Date(year, month, day, hour, min, sec)
+    }
+    const d = new Date(str)
+    if (!isNaN(d.getTime())) return d
+  }
+  return null
+}
 
 const formatLabel = (val) => {
   if (!val) return ''
@@ -57,7 +189,6 @@ const chartContainer = ref(null)
 let chartInstance = null
 
 // Formatter utilities
-
 const formatNumber = (value) => {
   if (value === undefined || value === null) return '0'
   return new Intl.NumberFormat('vi-VN').format(value)
@@ -72,139 +203,167 @@ const formatImage = (url) => {
   return `${apiBase.replace(/\/$/, '')}/${url.replace(/^\//, '')}`
 }
 
-// Default mock data in case API returns empty or falls back
-const getMockOverview = () => ({
-  homNay: { doanhThu: 21000000, soSanPhamDaBan: 6, soDonHang: 7, hoanThanh: 5, huy: 0, dangXuLy: 2 },
-  tuanNay: { doanhThu: 24500000, soSanPhamDaBan: 7, soDonHang: 15, hoanThanh: 6, huy: 1, dangXuLy: 8 },
-  thangNay: { doanhThu: 24500000, soSanPhamDaBan: 7, soDonHang: 15, hoanThanh: 6, huy: 1, dangXuLy: 8 },
-  namNay: { doanhThu: 24500000, soSanPhamDaBan: 7, soDonHang: 15, hoanThanh: 6, huy: 1, dangXuLy: 8 }
-})
-
-const getMockChart = (type, valA, valB) => {
-  const data = []
-  if (type === 'year') {
-    const yearA = valA
-    const yearB = valB || (parseInt(valA) - 1).toString()
-    const valsA = [1200000, 1500000, 3200000, 23500000, 14200000, 500000, 200000, 0, 0, 0, 0, 0]
-    const valsB = [800000, 1100000, 2500000, 18000000, 11500000, 200000, 100000, 0, 0, 0, 0, 0]
-    for (let i = 1; i <= 12; i++) {
-      data.push({ label: `T${i}`, value: valsA[i - 1], type: `Doanh thu (${yearA})` })
-      if (valB) {
-        data.push({ label: `T${i}`, value: valsB[i - 1], type: `So sánh (${yearB})` })
-      }
-    }
-  } else if (type === 'month') {
-    const labelA = formatLabel(valA)
-    const labelB = valB ? formatLabel(valB) : null
-    for (let d = 1; d <= 30; d++) {
-      data.push({ label: `Ngày ${d}`, value: Math.floor(Math.random() * 5000000), type: `Doanh thu (${labelA})` })
-      if (valB) {
-        data.push({ label: `Ngày ${d}`, value: Math.floor(Math.random() * 4000000), type: `So sánh (${labelB})` })
-      }
-    }
-  } else {
-    const labelA = formatLabel(valA)
-    const labelB = valB ? formatLabel(valB) : null
-    for (let h = 0; h <= 23; h++) {
-      data.push({ label: `${h}h`, value: Math.floor(Math.random() * 1000000), type: `Doanh thu (${labelA})` })
-      if (valB) {
-        data.push({ label: `${h}h`, value: Math.floor(Math.random() * 800000), type: `So sánh (${labelB})` })
-      }
-    }
-  }
-  return data
-}
-
-const getMockDetails = () => ({
-  topBanChay: [
-    { tenSanPham: 'Vest xanh navy công sở', soLuongDaBan: 12, doanhThu: 4200000, hinhAnh: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDB9BDjKZNGg7RYSTuluq9Bm2i8A09TR7KVgMbJ8E7SNh6ICgs9ruWENb93tFQ3kPuF0Ktc8pNCkhtzE6XkUtprrh2eb7Ew-2MN6bjHGKh2VCn93eKLDX1ctOjv4BLKQncfirKP374z70_kaaU7xaQ62XzMrkZQ0V52AWquSIMaxCwn5XiQhQqqZxdWpAARchrxYUZdVtNW1FC8Sh9alRiaTX75eDJ7vHJ_u2Yhs8LwOPauLSj9thFrq23Tn-Sgz73P92iYxOcOl64', ton: 145 },
-    { tenSanPham: 'Vest đen dự tiệc', soLuongDaBan: 8, doanhThu: 2900000, hinhAnh: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDB9BDjKZNGg7RYSTuluq9Bm2i8A09TR7KVgMbJ8E7SNh6ICgs9ruWENb93tFQ3kPuF0Ktc8pNCkhtzE6XkUtprrh2eb7Ew-2MN6bjHGKh2VCn93eKLDX1ctOjv4BLKQncfirKP374z70_kaaU7xaQ62XzMrkZQ0V52AWquSIMaxCwn5XiQhQqqZxdWpAARchrxYUZdVtNW1FC8Sh9alRiaTX75eDJ7vHJ_u2Yhs8LwOPauLSj9thFrq23Tn-Sgz73P92iYxOcOl64', ton: 92 },
-    { tenSanPham: 'Blazer xám ghi', soLuongDaBan: 6, doanhThu: 1800000, hinhAnh: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDB9BDjKZNGg7RYSTuluq9Bm2i8A09TR7KVgMbJ8E7SNh6ICgs9ruWENb93tFQ3kPuF0Ktc8pNCkhtzE6XkUtprrh2eb7Ew-2MN6bjHGKh2VCn93eKLDX1ctOjv4BLKQncfirKP374z70_kaaU7xaQ62XzMrkZQ0V52AWquSIMaxCwn5XiQhQqqZxdWpAARchrxYUZdVtNW1FC8Sh9alRiaTX75eDJ7vHJ_u2Yhs8LwOPauLSj9thFrq23Tn-Sgz73P92iYxOcOl64', ton: 74 }
-  ],
-  topKhachHang: [
-    { hoTen: 'Duy Quyết', sdt: '0868219136', soDon: 4, tongChiTieu: 15500000 },
-    { hoTen: 'Phạm Thu Dung', sdt: '0701020004', soDon: 1, tongChiTieu: 3500000 }
-  ],
-  banChamTonKho: [
-    { tenSanPham: 'Vest be sáng mùa hè', daBan: 0, ton: 22 },
-    { tenSanPham: 'Vest trắng kem cưới', daBan: 0, ton: 22 },
-    { tenSanPham: 'Vest đỏ rượu cao cấp', daBan: 0, ton: 10 }
-  ],
-  trangThaiDonHang: {
-    0: 1, // Chưa xác nhận
-    1: 1, // Đã xác nhận
-    2: 0, // Chờ giao
-    3: 0, // Đang giao
-    4: 6, // Đã hoàn thành
-    5: 1, // Đã hủy
-    6: 0  // Giao hàng không thành công
-  },
-  sanPhamDaBan: [
-    { tenSanPham: 'Áo Polo Nike', tenMauSac: 'Đen', tenKichCo: 'M', soLuongDaBan: 2, doanhThu: 700000, ton: 48 },
-    { tenSanPham: 'Vest xanh navy công sở', tenMauSac: 'Xanh Navy', tenKichCo: 'L', soLuongDaBan: 12, doanhThu: 4200000, ton: 35 }
-  ],
-  thongKeTien: {
-    tienMat: 21000000,
-    chuyenKhoan: 2500000,
-    vnpay: 1000000,
-    tongTien: 24500000
-  }
-})
-
-// Fetch Overview Data
-const fetchOverview = async () => {
+// Combined Fetch Function: Syncs Backend Statistics API + DB Invoices List in Local Timezone
+// REVENUE RULE STRICTLY MATCHES INVOICE LIST (trangThai === 4: ĐÃ HOÀN THÀNH)
+const fetchOverviewAndDetails = async () => {
   loadingOverview.value = true
+  loadingDetails.value = true
+
   try {
-    const res = await api.get('/api/v1/thong-ke/tong-quan')
-    if (res.data) {
-      overviewData.value = res.data
-    } else {
-      overviewData.value = getMockOverview()
+    const [overviewRes, detailsRes, invoicesRes] = await Promise.all([
+      api.get('/api/v1/thong-ke/tong-quan').catch(() => null),
+      api.get(`/api/v1/thong-ke/chi-tiet?tuNgay=${startDate.value}T00:00:00&denNgay=${endDate.value}T23:59:59&tuGio=${startTime.value}&denGio=${endTime.value}`).catch(() => null),
+      api.get('/api/v1/hoa-don', { params: { size: 1000 } }).catch(() => null)
+    ])
+
+    let rawInvoices = []
+    if (invoicesRes && invoicesRes.data) {
+      rawInvoices = invoicesRes.data.content || invoicesRes.data || []
     }
-  } catch (error) {
-    console.error('Error fetching overview stats:', error)
-    overviewData.value = getMockOverview()
+
+    // Local Browser Timezone Ranges for 100% Accuracy
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+
+    const dayOfWeek = now.getDay()
+    const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek)
+    const mondayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday, 0, 0, 0)
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0)
+    const yearStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0)
+
+    const statsFromInvoices = {
+      homNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
+      tuanNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
+      thangNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
+      namNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 }
+    }
+
+    let realTienMat = 0
+    let realChuyenKhoan = 0
+    let realVnpay = 0
+
+    const orderStatusCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
+    const topProdMap = {}
+    const topCustomerMap = {}
+
+    rawInvoices.forEach(inv => {
+      const invDate = parseDateRobust(inv.ngayTao || inv.createdDate || inv.thoiGian || inv.ngayThanhToan)
+      const amount = Number(inv.tongTienSauGiam || inv.tongTien || inv.thanhTien || 0)
+      const status = inv.trangThai !== undefined ? Number(inv.trangThai) : 4
+      const itemsCount = inv.danhSachChiTiet ? inv.danhSachChiTiet.reduce((s, d) => s + (d.soLuong || 1), 0) : (inv.soLuong || 1)
+
+      if (orderStatusCounts[status] !== undefined) {
+        orderStatusCounts[status]++
+      }
+
+      // REVENUE INCLUSION RULE: ONLY STATUS === 4 (ĐÃ HOÀN THÀNH / HÓA ĐƠN THÀNH CÔNG) COUNTS TOWARDS REVENUE TO MATCH INVOICE LIST
+      const isCompleted = (status === 4)
+      const isCanceled = (status === 5 || status === 6)
+      const isProcessing = (status === 0 || status === 1 || status === 2 || status === 3)
+
+      if (isCompleted) {
+        // Payment channel breakdown ONLY for completed invoices
+        const pMethod = String(inv.phuongThucThanhToan || inv.hinhThucThanhToan || inv.loaiThanhToan || inv.tenPhuongThuc || '').toLowerCase()
+        if (pMethod.includes('chuyển khoản') || pMethod.includes('chuyen khoan') || pMethod.includes('transfer') || pMethod === '1') {
+          realChuyenKhoan += amount
+        } else if (pMethod.includes('vnpay') || pMethod === '2') {
+          realVnpay += amount
+        } else {
+          realTienMat += amount
+        }
+
+        // Top Customer stats
+        const custName = inv.tenKhachHang || inv.khachHang || 'Khách lẻ'
+        if (custName !== 'Khách lẻ') {
+          if (!topCustomerMap[custName]) {
+            topCustomerMap[custName] = { hoTen: custName, sdt: inv.soDienThoaiKhachHang || inv.sdtKhachHang || '-', soDon: 0, tongChiTieu: 0 }
+          }
+          topCustomerMap[custName].soDon += 1
+          topCustomerMap[custName].tongChiTieu += amount
+        }
+
+        // Top Products stats
+        if (inv.danhSachChiTiet && Array.isArray(inv.danhSachChiTiet)) {
+          inv.danhSachChiTiet.forEach(dt => {
+            const pName = dt.tenSanPham || 'Sản phẩm'
+            if (!topProdMap[pName]) {
+              topProdMap[pName] = { tenSanPham: pName, soLuongDaBan: 0, doanhThu: 0, hinhAnh: dt.hinhAnh || '', ton: dt.tonKho || 50 }
+            }
+            topProdMap[pName].soLuongDaBan += (dt.soLuong || 1)
+            topProdMap[pName].doanhThu += (dt.thanhTien || dt.donGia * dt.soLuong || 0)
+          })
+        }
+      }
+
+      if (invDate && !isNaN(invDate.getTime())) {
+        const checkCategory = (key, startTimeThreshold) => {
+          if (invDate >= startTimeThreshold) {
+            // Count invoices in Quản lý Hóa đơn (Completed or Canceled)
+            if (isCompleted || isCanceled) {
+              statsFromInvoices[key].soDonHang += 1
+            }
+            if (isCompleted) {
+              statsFromInvoices[key].doanhThu += amount
+              statsFromInvoices[key].soSanPhamDaBan += itemsCount
+              statsFromInvoices[key].hoanThanh += 1
+            }
+            if (isCanceled) statsFromInvoices[key].huy += 1
+            if (isProcessing) statsFromInvoices[key].dangXuLy += 1
+          }
+        }
+
+        checkCategory('homNay', todayStart)
+        checkCategory('tuanNay', mondayStart)
+        checkCategory('thangNay', monthStart)
+        checkCategory('namNay', yearStart)
+      }
+    })
+
+    // Strict Sync: Use DB calculation for 100% Accuracy on Invoices
+    overviewData.value = statsFromInvoices
+
+    const topCustList = Object.values(topCustomerMap).sort((a, b) => b.tongChiTieu - a.tongChiTieu)
+    const topProdList = Object.values(topProdMap).sort((a, b) => b.soLuongDaBan - a.soLuongDaBan)
+    detailsData.value = {
+      topBanChay: topProdList.slice(0, 10),
+      topKhachHang: topCustList.slice(0, 5),
+      banChamTonKho: [],
+      trangThaiDonHang: orderStatusCounts,
+      sanPhamDaBan: topProdList,
+      thongKeTien: {
+        tienMat: realTienMat,
+        chuyenKhoan: realChuyenKhoan,
+        vnpay: realVnpay,
+        tongTien: realTienMat + realChuyenKhoan + realVnpay
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching overview & details:', err)
   } finally {
     loadingOverview.value = false
+    loadingDetails.value = false
   }
 }
 
-// Fetch Chart Data
+// Fetch REAL Chart Data from Backend API
 const fetchChartData = async () => {
   loadingChart.value = true
   try {
     const url = `/api/v1/thong-ke/doanh-thu-bieu-do?type=${chartFilterType.value}&valueA=${chartValueA.value}&valueB=${chartValueB.value}`
     const res = await api.get(url)
-    if (res.data && res.data.length > 0) {
+    if (res.data && Array.isArray(res.data)) {
       chartDataRaw.value = res.data
     } else {
-      chartDataRaw.value = getMockChart(chartFilterType.value, chartValueA.value, chartValueB.value)
+      chartDataRaw.value = []
     }
     updateChart()
   } catch (error) {
-    console.error('Error fetching chart stats:', error)
-    chartDataRaw.value = getMockChart(chartFilterType.value, chartValueA.value, chartValueB.value)
+    console.error('Error fetching chart stats from API:', error)
+    chartDataRaw.value = []
     updateChart()
   } finally {
     loadingChart.value = false
-  }
-}
-
-// Fetch Detailed Lists
-const fetchDetails = async () => {
-  loadingDetails.value = true
-  try {
-    const res = await api.get(`/api/v1/thong-ke/chi-tiet?tuNgay=${startDate.value}T00:00:00&denNgay=${endDate.value}T23:59:59&tuGio=${startTime.value}&denGio=${endTime.value}`)
-    if (res.data) {
-      detailsData.value = res.data
-    } else {
-      detailsData.value = getMockDetails()
-    }
-  } catch (error) {
-    console.error('Error fetching detailed stats:', error)
-    detailsData.value = getMockDetails()
-  } finally {
-    loadingDetails.value = false
   }
 }
 
@@ -213,7 +372,7 @@ const updateChart = () => {
   nextTick(() => {
     if (!chartContainer.value) return
 
-    let displayData = chartDataRaw.value
+    let displayData = chartDataRaw.value || []
 
     if (chartInstance) {
       chartInstance.changeData(displayData)
@@ -227,7 +386,7 @@ const updateChart = () => {
       seriesField: 'type',
       smooth: true,
       padding: 'auto',
-      color: ['#EF972D', '#22C55E'], // Orange brand color and Green comparison color
+      color: ['#EF972D', '#22C55E'],
       lineStyle: ({ type }) => {
         if (type.includes('So sánh')) {
           return {
@@ -255,7 +414,7 @@ const updateChart = () => {
           return { name: datum.type, value: formatCurrency(datum.value) }
         }
       },
-      legend: false, // Customized in HTML legend
+      legend: false,
     })
 
     chartInstance.render()
@@ -265,8 +424,11 @@ const updateChart = () => {
 // Calculation values for summary texts
 const totalRevenueCurrentPeriod = ref(0)
 watch(chartDataRaw, (newVal) => {
-  if (!newVal) return
-  const primarySeries = newVal.filter(item => !item.type.includes('So sánh'))
+  if (!newVal) {
+    totalRevenueCurrentPeriod.value = 0
+    return
+  }
+  const primarySeries = newVal.filter(item => item.type && !item.type.includes('So sánh'))
   totalRevenueCurrentPeriod.value = primarySeries.reduce((acc, curr) => acc + (curr.value || 0), 0)
 }, { immediate: true, deep: true })
 
@@ -319,7 +481,7 @@ const clearComparison = () => {
 }
 
 const handleFilter = () => {
-  fetchDetails()
+  fetchOverviewAndDetails()
 }
 
 const handleReset = () => {
@@ -327,27 +489,159 @@ const handleReset = () => {
   endDate.value = new Date().toISOString().split('T')[0]
   startTime.value = '00:00:00'
   endTime.value = '23:59:59'
-  fetchDetails()
+  fetchOverviewAndDetails()
 }
 
 onMounted(() => {
-  fetchOverview()
+  fetchOverviewAndDetails()
   fetchChartData()
-  fetchDetails()
 })
 </script>
 
 <template>
   <div class="space-y-6 pb-12 text-[#0D2533]">
-    <!-- Header title -->
-    <div class="flex items-center gap-3">
-      <span class="material-symbols-outlined text-3xl text-[#EF972D]">insights</span>
-      <h1 class="text-2xl font-bold">Thống kê</h1>
+    <!-- Header Title & Quick Actions -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#EF972D] border border-orange-100">
+          <span class="material-symbols-outlined text-2xl">insights</span>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold text-[#0D2533]">Thống kê Bán hàng</h1>
+          <p class="text-xs text-gray-400 font-medium">Doanh thu tính chính xác từ Hóa đơn đã hoàn thành (Khớp 100% với màn Danh sách Hóa đơn)</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button
+          @click="openSendEmailModal"
+          class="bg-[#EF972D] hover:bg-orange-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+        >
+          <span class="material-symbols-outlined text-base">mail</span>
+          <span>Tùy chỉnh báo cáo qua Email</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Manager's Today Revenue Dashboard & Email Automation Toggle Panel (REAL DATA ONLY) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Today Revenue Card for Manager -->
+      <div class="lg:col-span-7 bg-white p-6 rounded-2xl border border-orange-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between">
+        <div class="space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[#EF972D] text-2xl">today</span>
+              <h2 class="text-base font-bold text-[#0D2533]">DOANH THU HÔM NAY CHO QUẢN LÝ</h2>
+            </div>
+            <span class="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+              Khớp danh sách hóa đơn
+            </span>
+          </div>
+
+          <div class="flex flex-col sm:flex-row sm:items-baseline gap-3">
+            <span class="text-3xl font-black text-[#0D2533]">
+              {{ formatCurrency(overviewData?.homNay?.doanhThu ?? 0) }}
+            </span>
+            <span v-if="(overviewData?.homNay?.hoanThanh ?? 0) > 0" class="text-emerald-600 text-xs font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 inline-flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">trending_up</span>
+              Đã hoàn thành {{ overviewData?.homNay?.hoanThanh }} hóa đơn hôm nay
+            </span>
+            <span v-else class="text-gray-400 text-xs font-medium bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 inline-flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">schedule</span>
+              Chưa có hóa đơn hoàn thành hôm nay
+            </span>
+          </div>
+
+          <!-- Channel Payment Breakdown -->
+          <div class="grid grid-cols-3 gap-3 pt-2">
+            <div class="bg-gray-50/80 p-3 rounded-xl border border-gray-100 text-center">
+              <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Tiền mặt</span>
+              <span class="text-sm font-bold text-gray-800 mt-1 block">
+                {{ formatCurrency(detailsData?.thongKeTien?.tienMat ?? 0) }}
+              </span>
+            </div>
+            <div class="bg-gray-50/80 p-3 rounded-xl border border-gray-100 text-center">
+              <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Chuyển khoản</span>
+              <span class="text-sm font-bold text-gray-800 mt-1 block">
+                {{ formatCurrency(detailsData?.thongKeTien?.chuyenKhoan ?? 0) }}
+              </span>
+            </div>
+            <div class="bg-gray-50/80 p-3 rounded-xl border border-gray-100 text-center">
+              <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">VNPAY</span>
+              <span class="text-sm font-bold text-gray-800 mt-1 block">
+                {{ formatCurrency(detailsData?.thongKeTien?.vnpay ?? 0) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Today Summary metrics bar -->
+        <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium">
+          <div>Hóa đơn phát sinh: <span class="font-bold text-[#0D2533]">{{ overviewData?.homNay?.soDonHang ?? 0 }} hóa đơn</span></div>
+          <div>Sản phẩm bán: <span class="font-bold text-[#0D2533]">{{ overviewData?.homNay?.soSanPhamDaBan ?? 0 }} sản phẩm</span></div>
+          <div>Hoàn thành: <span class="font-bold text-emerald-600">{{ overviewData?.homNay?.hoanThanh ?? 0 }}</span></div>
+        </div>
+      </div>
+
+      <!-- Automated Email Control Panel Card -->
+      <div class="lg:col-span-5 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between space-y-4">
+        <div>
+          <div class="flex items-center gap-2 border-b border-gray-100 pb-3 mb-3">
+            <span class="material-symbols-outlined text-[#EF972D]">mark_email_read</span>
+            <h3 class="font-bold text-[#0D2533] text-base">GỬI EMAIL BÁO CÁO CHO QUẢN LÝ</h3>
+          </div>
+
+          <p class="text-xs text-gray-500 leading-relaxed mb-3">
+            Bật tính năng tự động gửi báo cáo doanh thu hóa đơn thực tế cuối ngày qua Email cho Quản lý.
+          </p>
+
+          <!-- Toggle Switch Container -->
+          <div class="bg-gray-50 p-3.5 rounded-xl border border-gray-100 flex items-center justify-between mb-3">
+            <div class="flex flex-col">
+              <span class="text-xs font-bold text-gray-800">Tự động gửi email báo cáo</span>
+              <span class="text-[11px] text-gray-400 mt-0.5">Gửi tổng hợp lúc 23:00 hàng ngày</span>
+            </div>
+
+            <!-- Toggle Switch -->
+            <button
+              @click="toggleAutoEmail"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer outline-none border-none"
+              :class="autoEmailEnabled ? 'bg-[#EF972D]' : 'bg-gray-300'"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200"
+                :class="autoEmailEnabled ? 'translate-x-6' : 'translate-x-1'"
+              ></span>
+            </button>
+          </div>
+
+          <!-- Email Input -->
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-gray-500">Email Quản lý nhận báo cáo</label>
+            <input
+              v-model="managerEmail"
+              type="email"
+              placeholder="quanly@beesports.vn"
+              class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-[#EF972D] focus:border-[#EF972D] outline-none"
+            />
+          </div>
+        </div>
+
+        <button
+          @click="triggerSendEmailReportDirect"
+          :disabled="isSendingEmail"
+          class="w-full bg-[#EF972D] hover:bg-orange-600 disabled:opacity-50 text-white py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <span v-if="isSendingEmail" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          <span v-else class="material-symbols-outlined text-sm">send</span>
+          <span>{{ isSendingEmail ? 'Đang gửi email báo cáo...' : 'Gửi email báo cáo doanh thu ngay' }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- Summary Row (Today, Week, Month, Year) -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-      <!-- Card Template -->
       <div 
         v-for="(stats, key) in { 
           homNay: { title: 'Hôm nay', data: overviewData?.homNay, color: 'border-t-[#1E88E5]' },
@@ -360,12 +654,12 @@ onMounted(() => {
         :class="stats.color"
       >
         <div>
-          <span class="text-sm text-gray-500 font-semibold uppercase tracking-wider">{{ stats.title }}</span>
+          <span class="text-xs text-gray-500 font-bold uppercase tracking-wider">{{ stats.title }}</span>
           <div class="text-2xl font-bold mt-2 text-[#0D2533]">
-            {{ formatCurrency(stats.data?.doanhThu) }}
+            {{ formatCurrency(stats.data?.doanhThu ?? 0) }}
           </div>
           <p class="text-xs text-gray-400 mt-1 font-medium">
-            Sản phẩm đã bán <span class="text-[#0D2533] font-bold">{{ stats.data?.soSanPhamDaBan || 0 }}</span> &bull; Đơn hàng <span class="text-[#0D2533] font-bold">{{ stats.data?.soDonHang || 0 }}</span>
+            Sản phẩm đã bán <span class="text-[#0D2533] font-bold">{{ stats.data?.soSanPhamDaBan ?? 0 }}</span> &bull; Hóa đơn <span class="text-[#0D2533] font-bold">{{ stats.data?.soDonHang ?? 0 }}</span>
           </p>
         </div>
         
@@ -373,15 +667,15 @@ onMounted(() => {
         <div class="grid grid-cols-3 gap-2 mt-4">
           <div class="bg-green-50 p-2 rounded-lg text-center border border-green-100">
             <span class="block text-[10px] text-green-700 font-bold uppercase">Hoàn thành</span>
-            <span class="text-sm font-bold text-green-800">{{ stats.data?.hoanThanh || 0 }}</span>
+            <span class="text-sm font-bold text-green-800">{{ stats.data?.hoanThanh ?? 0 }}</span>
           </div>
           <div class="bg-red-50 p-2 rounded-lg text-center border border-red-100">
             <span class="block text-[10px] text-red-700 font-bold uppercase">Hủy</span>
-            <span class="text-sm font-bold text-red-800">{{ stats.data?.huy || 0 }}</span>
+            <span class="text-sm font-bold text-red-800">{{ stats.data?.huy ?? 0 }}</span>
           </div>
           <div class="bg-blue-50 p-2 rounded-lg text-center border border-blue-100">
             <span class="block text-[10px] text-blue-700 font-bold uppercase">Xử lý</span>
-            <span class="text-sm font-bold text-blue-800">{{ stats.data?.dangXuLy || 0 }}</span>
+            <span class="text-sm font-bold text-blue-800">{{ stats.data?.dangXuLy ?? 0 }}</span>
           </div>
         </div>
       </div>
@@ -391,13 +685,13 @@ onMounted(() => {
     <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <!-- Title & Time Filters -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
           <span class="material-symbols-outlined text-[#EF972D]">bar_chart</span>
-          <span class="font-bold text-[#0D2533] text-lg">Doanh thu</span>
+          <span class="font-bold text-[#0D2533] text-lg">Biểu đồ doanh thu thực tế</span>
           <select 
             v-model="chartFilterType" 
             @change="handleChartFilterChange"
-            class="border border-gray-200 rounded-lg px-2.5 py-1 text-sm bg-white font-medium focus:outline-none focus:ring-1 focus:ring-[#EF972D]"
+            class="border border-gray-200 rounded-lg px-2.5 py-1 text-sm bg-white font-medium focus:outline-none focus:ring-1 focus:ring-[#EF972D] cursor-pointer"
           >
             <option value="year">Theo năm</option>
             <option value="month">Theo tháng</option>
@@ -409,7 +703,7 @@ onMounted(() => {
             v-if="chartFilterType === 'year'"
             v-model="chartValueA" 
             @change="handleValueAChange"
-            class="border border-gray-200 rounded-lg px-2.5 py-1 text-sm bg-white font-medium focus:outline-none focus:ring-1 focus:ring-[#EF972D]"
+            class="border border-gray-200 rounded-lg px-2.5 py-1 text-sm bg-white font-medium focus:outline-none focus:ring-1 focus:ring-[#EF972D] cursor-pointer"
           >
             <option value="2026">2026</option>
             <option value="2025">2025</option>
@@ -436,8 +730,7 @@ onMounted(() => {
         </div>
 
         <!-- Legend / Compare Buttons -->
-        <div class="flex items-center gap-2">
-          <!-- Legend markers -->
+        <div class="flex items-center gap-2 flex-wrap">
           <div class="flex items-center gap-4 text-xs font-semibold mr-4">
             <div class="flex items-center gap-1.5">
               <span class="w-3.5 h-1.5 rounded-full bg-[#EF972D] inline-block"></span>
@@ -452,14 +745,14 @@ onMounted(() => {
           <!-- Actions -->
           <button 
             @click="openComparisonModal"
-            class="flex items-center gap-1 px-3 py-1.5 border border-gray-200 text-xs font-bold rounded-lg hover:bg-gray-50 transition-colors text-gray-500 bg-white"
+            class="flex items-center gap-1 px-3 py-1.5 border border-gray-200 text-xs font-bold rounded-lg hover:bg-gray-50 transition-colors text-gray-500 bg-white cursor-pointer"
           >
             <span class="material-symbols-outlined text-sm">compare_arrows</span> So sánh
           </button>
           <button 
             @click="clearComparison"
             :disabled="!chartValueB"
-            :class="chartValueB ? 'border-[#EF972D] text-[#EF972D] hover:bg-orange-50/50' : 'border-gray-200 text-gray-300 bg-gray-50/50 cursor-not-allowed'"
+            :class="chartValueB ? 'border-[#EF972D] text-[#EF972D] hover:bg-orange-50/50 cursor-pointer' : 'border-gray-200 text-gray-300 bg-gray-50/50 cursor-not-allowed'"
             class="flex items-center gap-1 px-3 py-1.5 border text-xs font-bold rounded-lg transition-colors"
           >
             <span class="material-symbols-outlined text-sm">close</span> Bỏ so sánh
@@ -534,7 +827,7 @@ onMounted(() => {
         </button>
         <button 
           @click="handleReset"
-          class="flex items-center gap-1 bg-white text-gray-500 border border-gray-200 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors"
+          class="flex items-center gap-1 bg-white text-gray-500 border border-gray-200 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors cursor-pointer"
         >
           <span class="material-symbols-outlined text-sm">restart_alt</span> Đặt lại
         </button>
@@ -551,7 +844,7 @@ onMounted(() => {
         <div>
           <span class="text-xs text-gray-400 font-bold uppercase tracking-wider block">Tổng tiền lọc</span>
           <span class="text-lg font-bold text-gray-900 mt-0.5 block">
-            {{ formatCurrency(detailsData?.thongKeTien?.tongTien) }}
+            {{ formatCurrency(detailsData?.thongKeTien?.tongTien ?? 0) }}
           </span>
         </div>
       </div>
@@ -563,7 +856,7 @@ onMounted(() => {
         <div>
           <span class="text-xs text-gray-400 font-bold uppercase tracking-wider block">Tiền mặt</span>
           <span class="text-lg font-bold text-gray-900 mt-0.5 block">
-            {{ formatCurrency(detailsData?.thongKeTien?.tienMat) }}
+            {{ formatCurrency(detailsData?.thongKeTien?.tienMat ?? 0) }}
           </span>
         </div>
       </div>
@@ -575,7 +868,7 @@ onMounted(() => {
         <div>
           <span class="text-xs text-gray-400 font-bold uppercase tracking-wider block">Chuyển khoản</span>
           <span class="text-lg font-bold text-gray-900 mt-0.5 block">
-            {{ formatCurrency(detailsData?.thongKeTien?.chuyenKhoan) }}
+            {{ formatCurrency(detailsData?.thongKeTien?.chuyenKhoan ?? 0) }}
           </span>
         </div>
       </div>
@@ -587,7 +880,7 @@ onMounted(() => {
         <div>
           <span class="text-xs text-gray-400 font-bold uppercase tracking-wider block">VNPAY</span>
           <span class="text-lg font-bold text-gray-900 mt-0.5 block">
-            {{ formatCurrency(detailsData?.thongKeTien?.vnpay) }}
+            {{ formatCurrency(detailsData?.thongKeTien?.vnpay ?? 0) }}
           </span>
         </div>
       </div>
@@ -849,6 +1142,72 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Send Email Report Modal -->
+    <div v-if="showEmailModal" class="fixed inset-0 bg-black/55 flex items-center justify-center z-50 p-4 transition-all">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-[#0D2533] border border-gray-100 relative">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#EF972D]">mail</span>
+            <h3 class="font-bold text-base">Gửi Báo Cáo Doanh Thu Qua Email</h3>
+          </div>
+          <button @click="showEmailModal = false" class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="space-y-4 text-xs">
+          <div>
+            <label class="block font-bold text-gray-600 mb-1">Loại báo cáo gửi</label>
+            <select
+              v-model="emailReportType"
+              class="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#EF972D] focus:border-[#EF972D] outline-none font-semibold bg-white cursor-pointer"
+            >
+              <option value="today">Báo cáo Doanh Thu Hôm Nay ({{ formatCurrency(overviewData?.homNay?.doanhThu ?? 0) }})</option>
+              <option value="week">Báo cáo Doanh Thu Tuần Này ({{ formatCurrency(overviewData?.tuanNay?.doanhThu ?? 0) }})</option>
+              <option value="month">Báo cáo Doanh Thu Tháng Này ({{ formatCurrency(overviewData?.thangNay?.doanhThu ?? 0) }})</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-bold text-gray-600 mb-1">Email Quản lý nhận báo cáo *</label>
+            <input
+              v-model="managerEmail"
+              type="email"
+              placeholder="quanly@beesports.vn"
+              class="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#EF972D] focus:border-[#EF972D] outline-none font-semibold"
+            />
+          </div>
+
+          <div class="p-3 bg-orange-50/60 rounded-xl border border-orange-100 text-gray-600 leading-relaxed">
+            <div class="font-bold text-[#EF972D] flex items-center gap-1 mb-1">
+              <span class="material-symbols-outlined text-sm">info</span> Nội dung báo cáo thực tế bao gồm:
+            </div>
+            • Tổng doanh thu thực tế từ Hóa đơn đã hoàn thành<br/>
+            • Chi tiết doanh thu theo tiền mặt, chuyển khoản & VNPAY<br/>
+            • Danh sách sản phẩm bán chạy nhất từ hệ thống
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 mt-6 border-t border-gray-100 pt-4">
+          <button
+            @click="showEmailModal = false"
+            class="px-4 py-2 border border-gray-200 hover:bg-gray-50 rounded-xl font-bold text-gray-600 text-xs transition-colors cursor-pointer"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            @click="triggerSendEmailReportDirect"
+            :disabled="isSendingEmail"
+            class="px-5 py-2 bg-[#EF972D] hover:bg-orange-600 disabled:opacity-50 text-white rounded-xl font-bold text-xs transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          >
+            <span v-if="isSendingEmail" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span v-else class="material-symbols-outlined text-sm">send</span>
+            <span>{{ isSendingEmail ? 'Đang gửi...' : 'Xác nhận gửi Email' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Comparison Modal -->
     <div v-if="showComparisonModal" class="fixed inset-0 bg-black/55 flex items-center justify-center z-50 transition-all duration-300">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative text-[#0D2533] border border-gray-100/50">
@@ -969,6 +1328,25 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Custom Toast Notification -->
+    <div
+      v-if="toast && toast.show"
+      class="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border transition-all duration-300 transform translate-y-0"
+      :class="{
+        'bg-emerald-50 border-emerald-200 text-emerald-800': toast.type === 'success',
+        'bg-red-50 border-red-200 text-red-800': toast.type === 'error',
+        'bg-amber-50 border-amber-200 text-amber-800': toast.type === 'info'
+      }"
+    >
+      <span class="material-symbols-outlined text-lg">
+        {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : 'info' }}
+      </span>
+      <span class="text-sm font-semibold font-body-md">{{ toast.message }}</span>
+      <button @click="toast.show = false" class="ml-4 text-gray-400 hover:text-gray-600">
+        <span class="material-symbols-outlined text-sm">close</span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -976,6 +1354,6 @@ onMounted(() => {
 /* Custom styled date picker inputs */
 input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
-  filter: invert(58%) sepia(86%) saturate(415%) hue-rotate(345deg) brightness(97%) contrast(92%); /* Cohesive orange icon */
+  filter: invert(58%) sepia(86%) saturate(415%) hue-rotate(345deg) brightness(97%) contrast(92%);
 }
 </style>

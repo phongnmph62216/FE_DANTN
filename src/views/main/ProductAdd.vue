@@ -570,11 +570,159 @@ const handleSave = async () => {
   )
 }
 
+// Quick Add Attribute Modal State & Config
+const showQuickAddModal = ref(false)
+const quickAddType = ref('')
+const quickAddName = ref('')
+const isSubmittingQuickAdd = ref(false)
+
+const quickAddConfig = computed(() => ({
+  brand: { title: 'Thương hiệu', endpoint: '/api/v1/thuong-hieu', listRef: brands, selectedRef: selectedBrand },
+  origin: { title: 'Xuất xứ', endpoint: '/api/v1/xuat-su', listRef: origins, selectedRef: selectedOrigin },
+  type: { title: 'Loại áo', endpoint: '/api/v1/loai-san-pham', listRef: types, selectedRef: selectedType },
+  style: { title: 'Kiểu dáng', endpoint: '/api/v1/kieu-dang', listRef: styles, selectedRef: selectedStyle },
+  material: { title: 'Chất liệu', endpoint: '/api/v1/chat-lieu', listRef: materials, selectedRef: selectedMaterial },
+  collar: { title: 'Cổ áo', endpoint: '/api/v1/co-ao', listRef: collars, selectedRef: selectedCollar },
+  sleeve: { title: 'Tay áo', endpoint: '/api/v1/tay-ao', listRef: sleeves, selectedRef: selectedSleeve },
+  shoulder: { title: 'Vai áo', endpoint: '/api/v1/vai-ao', listRef: shoulders, selectedRef: selectedShoulder },
+}))
+
+const validateAttributeInput = (type, name) => {
+  const trimmed = name.trim()
+  
+  if (trimmed.length < 1) {
+    return { valid: false, message: 'Tên thuộc tính không được để trống!' }
+  }
+  if (trimmed.length > 50) {
+    return { valid: false, message: 'Tên thuộc tính không được dài quá 50 ký tự!' }
+  }
+
+  switch (type) {
+    case 'kich-thuoc':
+    case 'size': {
+      if (!/^[\p{L}\d\s/-]+$/u.test(trimmed)) {
+        return { 
+          valid: false, 
+          message: 'Kích thước chỉ được chứa chữ, số, khoảng trắng, gạch ngang (-) hoặc gạch chéo (/)!' 
+        }
+      }
+      break
+    }
+    
+    case 'chat-lieu':
+    case 'material': {
+      if (!/^[\p{L}\d\s%/-]+$/u.test(trimmed)) {
+        return { valid: false, message: 'Chất liệu chỉ được chứa chữ, số, khoảng trắng và các dấu % - /' }
+      }
+      break
+    }
+    
+    case 'xuat-xu':
+    case 'origin': {
+      if (!/^[\p{L}\s.-]+$/u.test(trimmed)) {
+        return { valid: false, message: 'Xuất xứ chỉ được chứa chữ, khoảng trắng, dấu chấm (.) hoặc gạch ngang (-)!' }
+      }
+      break
+    }
+    
+    case 'thuong-hieu':
+    case 'brand': {
+      if (!/^[\p{L}\d\s.&'"-]+$/u.test(trimmed)) {
+        return { valid: false, message: 'Thương hiệu chứa ký tự không hợp lệ (chỉ cho phép chữ, số, &, ., -, \')!' }
+      }
+      break
+    }
+    
+    default: {
+      if (!/^[\p{L}\d\s/() -]+$/u.test(trimmed)) {
+        return { valid: false, message: 'Dữ liệu chứa ký tự đặc biệt không hợp lệ!' }
+      }
+      break
+    }
+  }
+
+  return { valid: true }
+}
+
+const openQuickAddModal = (type) => {
+  quickAddType.value = type
+  quickAddName.value = ''
+  showQuickAddModal.value = true
+}
+
+const handleSaveQuickAdd = async () => {
+  const name = quickAddName.value.trim()
+  const config = quickAddConfig.value[quickAddType.value]
+  if (!config) return
+
+  const validation = validateAttributeInput(quickAddType.value, name)
+  if (!validation.valid) {
+    showToast(validation.message, 'error')
+    return
+  }
+
+  const exists = config.listRef.value.some(item => item.name.toLowerCase() === name.toLowerCase())
+  if (exists) {
+    showToast(`${config.title} "${name}" đã tồn tại trong danh sách!`, 'error')
+    return
+  }
+
+  isSubmittingQuickAdd.value = true
+  try {
+    const res = await api.post(config.endpoint, { ten: name, trangThai: 1 })
+    const createdId = res.data?.id || res.data || Date.now()
+    const createdItem = {
+      id: createdId,
+      name: name,
+      code: res.data?.ma || '',
+      isNew: true
+    }
+
+    // UNSHIFT TO THE VERY TOP OF THE LIST FOR EASY FINDING
+    config.listRef.value.unshift(createdItem)
+    // AUTOMATICALLY SELECT THE NEW ITEM
+    config.selectedRef.value = createdId
+
+    showToast(`Đã thêm mới ${config.title} "${name}" và đưa lên đầu danh sách thành công!`, 'success')
+    showQuickAddModal.value = false
+  } catch (err) {
+    console.error('Failed to create quick attribute:', err)
+    let errorMsg = err.message || 'Lỗi hệ thống'
+    if (err.response && err.response.data && err.response.data.message) {
+      errorMsg = err.response.data.message
+    }
+    showToast(`Không thể thêm mới: ${errorMsg}`, 'error')
+  } finally {
+    isSubmittingQuickAdd.value = false
+  }
+}
+
+// Active Popover & Search Queries for custom Searchable Dropdowns
+const activeDropdown = ref(null)
+const dropdownSearch = ref('')
+
+const toggleAttributeDropdown = (type, e) => {
+  if (e) e.stopPropagation()
+  if (activeDropdown.value === type) {
+    activeDropdown.value = null
+  } else {
+    activeDropdown.value = type
+    dropdownSearch.value = ''
+  }
+}
+
+const getFilteredList = (list) => {
+  if (!dropdownSearch.value.trim()) return list
+  const q = dropdownSearch.value.trim().toLowerCase()
+  return list.filter(item => item.name.toLowerCase().includes(q))
+}
+
 // Globals click event to close tag popovers
 const handleGlobalClick = (e) => {
   if (!e.target.closest('.relative')) {
     colorDropdownOpen.value = false
     sizeDropdownOpen.value = false
+    activeDropdown.value = null
   }
 }
 
@@ -625,7 +773,7 @@ onUnmounted(() => {
           </h2>
           
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2 md:col-span-2">
               <label class="text-sm font-semibold text-gray-700">Tên sản phẩm <span class="text-red-500">*</span></label>
               <input
                 v-model="productName"
@@ -637,36 +785,56 @@ onUnmounted(() => {
               <span v-if="errors.productName" class="text-xs text-red-500 font-medium">{{ errors.productName }}</span>
             </div>
             
-            <div class="flex flex-col gap-2">
-              <label class="text-sm font-semibold text-gray-700">Mã SP (SKU)</label>
-              <input
-                v-model="sku"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm outline-none font-semibold text-[#ef972d]"
-                placeholder="Tự động tạo nếu để trống"
-                type="text"
-              />
-            </div>
-            
+            <!-- Thương hiệu -->
             <div class="flex flex-col gap-2">
               <label class="text-sm font-semibold text-gray-700">Thương hiệu</label>
-              <select
-                v-model="selectedBrand"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-600 outline-none cursor-pointer"
-              >
-                <option value="">Chọn thương hiệu</option>
-                <option v-for="b in brands" :key="b.id" :value="b.id">{{ b.name }}</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <select
+                    v-model="selectedBrand"
+                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-700 outline-none cursor-pointer font-medium"
+                  >
+                    <option value="">Chọn thương hiệu</option>
+                    <option v-for="b in brands" :key="b.id" :value="b.id">
+                      {{ b.name }}{{ b.isNew ? ' ★ (Mới tạo)' : '' }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  @click="openQuickAddModal('brand')"
+                  class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 text-[#ef972d] hover:bg-[#ef972d] hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm flex-shrink-0"
+                  title="Thêm nhanh Thương hiệu mới"
+                >
+                  <span class="material-symbols-outlined text-xl font-bold">add</span>
+                </button>
+              </div>
             </div>
             
+            <!-- Xuất xứ -->
             <div class="flex flex-col gap-2">
               <label class="text-sm font-semibold text-gray-700">Xuất xứ</label>
-              <select
-                v-model="selectedOrigin"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-600 outline-none cursor-pointer"
-              >
-                <option value="">Chọn xuất xứ</option>
-                <option v-for="o in origins" :key="o.id" :value="o.id">{{ o.name }}</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <select
+                    v-model="selectedOrigin"
+                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-700 outline-none cursor-pointer font-medium"
+                  >
+                    <option value="">Chọn xuất xứ</option>
+                    <option v-for="o in origins" :key="o.id" :value="o.id">
+                      {{ o.name }}{{ o.isNew ? ' ★ (Mới tạo)' : '' }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  @click="openQuickAddModal('origin')"
+                  class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 text-[#ef972d] hover:bg-[#ef972d] hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm flex-shrink-0"
+                  title="Thêm nhanh Xuất xứ mới"
+                >
+                  <span class="material-symbols-outlined text-xl font-bold">add</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -678,70 +846,160 @@ onUnmounted(() => {
           </h2>
           
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Loại áo -->
             <div class="flex flex-col gap-2">
               <label class="text-sm font-semibold text-gray-700">Loại áo</label>
-              <select
-                v-model="selectedType"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-600 outline-none cursor-pointer"
-              >
-                <option value="">Chọn loại</option>
-                <option v-for="t in types" :key="t.id" :value="t.id">{{ t.name }}</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <select
+                    v-model="selectedType"
+                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-700 outline-none cursor-pointer font-medium"
+                  >
+                    <option value="">Chọn loại</option>
+                    <option v-for="t in types" :key="t.id" :value="t.id">
+                      {{ t.name }}{{ t.isNew ? ' ★ (Mới tạo)' : '' }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  @click="openQuickAddModal('type')"
+                  class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 text-[#ef972d] hover:bg-[#ef972d] hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm flex-shrink-0"
+                  title="Thêm nhanh Loại áo mới"
+                >
+                  <span class="material-symbols-outlined text-xl font-bold">add</span>
+                </button>
+              </div>
             </div>
             
+            <!-- Kiểu dáng -->
             <div class="flex flex-col gap-2">
               <label class="text-sm font-semibold text-gray-700">Kiểu dáng</label>
-              <select
-                v-model="selectedStyle"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-600 outline-none cursor-pointer"
-              >
-                <option value="">Chọn kiểu dáng</option>
-                <option v-for="s in styles" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <select
+                    v-model="selectedStyle"
+                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-700 outline-none cursor-pointer font-medium"
+                  >
+                    <option value="">Chọn kiểu dáng</option>
+                    <option v-for="s in styles" :key="s.id" :value="s.id">
+                      {{ s.name }}{{ s.isNew ? ' ★ (Mới tạo)' : '' }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  @click="openQuickAddModal('style')"
+                  class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 text-[#ef972d] hover:bg-[#ef972d] hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm flex-shrink-0"
+                  title="Thêm nhanh Kiểu dáng mới"
+                >
+                  <span class="material-symbols-outlined text-xl font-bold">add</span>
+                </button>
+              </div>
             </div>
             
+            <!-- Chất liệu -->
             <div class="flex flex-col gap-2">
               <label class="text-sm font-semibold text-gray-700">Chất liệu</label>
-              <select
-                v-model="selectedMaterial"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-600 outline-none cursor-pointer"
-              >
-                <option value="">Chọn chất liệu</option>
-                <option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }}</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <select
+                    v-model="selectedMaterial"
+                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-700 outline-none cursor-pointer font-medium"
+                  >
+                    <option value="">Chọn chất liệu</option>
+                    <option v-for="m in materials" :key="m.id" :value="m.id">
+                      {{ m.name }}{{ m.isNew ? ' ★ (Mới tạo)' : '' }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  @click="openQuickAddModal('material')"
+                  class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 text-[#ef972d] hover:bg-[#ef972d] hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm flex-shrink-0"
+                  title="Thêm nhanh Chất liệu mới"
+                >
+                  <span class="material-symbols-outlined text-xl font-bold">add</span>
+                </button>
+              </div>
             </div>
 
+            <!-- Cổ áo -->
             <div class="flex flex-col gap-2">
               <label class="text-sm font-semibold text-gray-700">Cổ áo</label>
-              <select
-                v-model="selectedCollar"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-600 outline-none cursor-pointer"
-              >
-                <option value="">Chọn loại cổ</option>
-                <option v-for="c in collars" :key="c.id" :value="c.id">{{ c.name }}</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <select
+                    v-model="selectedCollar"
+                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-700 outline-none cursor-pointer font-medium"
+                  >
+                    <option value="">Chọn loại cổ</option>
+                    <option v-for="c in collars" :key="c.id" :value="c.id">
+                      {{ c.name }}{{ c.isNew ? ' ★ (Mới tạo)' : '' }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  @click="openQuickAddModal('collar')"
+                  class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 text-[#ef972d] hover:bg-[#ef972d] hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm flex-shrink-0"
+                  title="Thêm nhanh Cổ áo mới"
+                >
+                  <span class="material-symbols-outlined text-xl font-bold">add</span>
+                </button>
+              </div>
             </div>
 
+            <!-- Tay áo -->
             <div class="flex flex-col gap-2">
               <label class="text-sm font-semibold text-gray-700">Tay áo</label>
-              <select
-                v-model="selectedSleeve"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-600 outline-none cursor-pointer"
-              >
-                <option value="">Chọn loại tay</option>
-                <option v-for="s in sleeves" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <select
+                    v-model="selectedSleeve"
+                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-700 outline-none cursor-pointer font-medium"
+                  >
+                    <option value="">Chọn loại tay</option>
+                    <option v-for="s in sleeves" :key="s.id" :value="s.id">
+                      {{ s.name }}{{ s.isNew ? ' ★ (Mới tạo)' : '' }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  @click="openQuickAddModal('sleeve')"
+                  class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 text-[#ef972d] hover:bg-[#ef972d] hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm flex-shrink-0"
+                  title="Thêm nhanh Tay áo mới"
+                >
+                  <span class="material-symbols-outlined text-xl font-bold">add</span>
+                </button>
+              </div>
             </div>
 
+            <!-- Vai áo -->
             <div class="flex flex-col gap-2">
               <label class="text-sm font-semibold text-gray-700">Vai áo</label>
-              <select
-                v-model="selectedShoulder"
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-600 outline-none cursor-pointer"
-              >
-                <option value="">Chọn loại vai</option>
-                <option v-for="s in shoulders" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <select
+                    v-model="selectedShoulder"
+                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm text-gray-700 outline-none cursor-pointer font-medium"
+                  >
+                    <option value="">Chọn loại vai</option>
+                    <option v-for="s in shoulders" :key="s.id" :value="s.id">
+                      {{ s.name }}{{ s.isNew ? ' ★ (Mới tạo)' : '' }}
+                    </option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  @click="openQuickAddModal('shoulder')"
+                  class="w-10 h-10 rounded-lg bg-orange-50 border border-orange-200 text-[#ef972d] hover:bg-[#ef972d] hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm flex-shrink-0"
+                  title="Thêm nhanh Vai áo mới"
+                >
+                  <span class="material-symbols-outlined text-xl font-bold">add</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1213,6 +1471,59 @@ onUnmounted(() => {
             class="px-5 py-2 bg-gradient-to-r from-[#FFB74D] to-[#EF972D] hover:opacity-95 text-white rounded-lg text-sm font-semibold shadow-sm transition-all cursor-pointer"
           >
             Xác nhận
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Add Attribute Modal -->
+    <div
+      v-if="showQuickAddModal"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+      @click.self="showQuickAddModal = false"
+    >
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 space-y-4 animate-scale-up text-[#0D2533]">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#ef972d]">add_circle</span>
+            <h3 class="font-bold text-base">
+              Thêm nhanh {{ quickAddConfig[quickAddType]?.title }} mới
+            </h3>
+          </div>
+          <button @click="showQuickAddModal = false" class="text-gray-400 hover:text-gray-600 cursor-pointer">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <label class="block font-bold text-gray-700">Tên {{ quickAddConfig[quickAddType]?.title }} mới *</label>
+          <input
+            v-model="quickAddName"
+            type="text"
+            :placeholder="`Nhập tên ${quickAddConfig[quickAddType]?.title.toLowerCase()}...`"
+            @keyup.enter="handleSaveQuickAdd"
+            class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-[#ef972d] focus:ring-1 focus:ring-[#ef972d] text-xs font-semibold text-gray-800"
+          />
+          <p class="text-[11px] text-gray-400 italic">
+            * Thuộc tính sau khi tạo sẽ tự động được đưa lên ĐẦU danh sách và chọn ngay lập tức.
+          </p>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+          <button
+            @click="showQuickAddModal = false"
+            class="px-4 py-2 border border-gray-200 hover:bg-gray-50 rounded-xl font-bold text-gray-600 text-xs transition-colors cursor-pointer"
+          >
+            Hủy
+          </button>
+          <button
+            @click="handleSaveQuickAdd"
+            :disabled="isSubmittingQuickAdd"
+            class="px-5 py-2 bg-[#ef972d] hover:bg-orange-600 disabled:opacity-50 text-white rounded-xl font-bold text-xs transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            <span v-if="isSubmittingQuickAdd" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span v-else class="material-symbols-outlined text-sm">check</span>
+            <span>{{ isSubmittingQuickAdd ? 'Đang tạo...' : 'Lưu & Chọn ngay' }}</span>
           </button>
         </div>
       </div>

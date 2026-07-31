@@ -542,6 +542,17 @@ const submitOrder = (e) => {
   showConfirmModal.value = true
 }
 
+const showFinalConfirmPopup = ref(false)
+
+const handleRequestOrderConfirm = () => {
+  showFinalConfirmPopup.value = true
+}
+
+const handleAcceptFinalOrder = async () => {
+  showFinalConfirmPopup.value = false
+  await confirmSubmitOrder()
+}
+
 const confirmSubmitOrder = async () => {
   showConfirmModal.value = false
   paymentError.value = ''
@@ -749,6 +760,10 @@ onMounted(async () => {
   }
 
   loadCart()
+  const priceRes = await cartStore.validateAndUpdatePrices(api).catch(() => null)
+  if (priceRes && priceRes.priceChanged) {
+    paymentError.value = priceRes.message
+  }
   await fetchProvinces()
   if (authStore.isLoggedIn) {
     await loadCustomerAddresses()
@@ -1325,11 +1340,45 @@ onMounted(async () => {
           </button>
           <button 
             type="button"
-            @click="confirmSubmitOrder" 
-            class="px-5 py-2.5 bg-[#ef972d] hover:bg-[#d88523] text-white rounded transition-colors text-sm font-bold uppercase tracking-wider shadow-sm flex items-center gap-1.5"
+            @click="handleRequestOrderConfirm" 
+            class="px-5 py-2.5 bg-[#ef972d] hover:bg-[#d88523] text-white rounded transition-colors text-sm font-bold uppercase tracking-wider shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
             <span class="material-symbols-outlined text-[18px]">done</span>
             Xác nhận đặt hàng
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Order Dialog Popup -->
+    <div v-if="showFinalConfirmPopup" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center space-y-4 border border-slate-100 animate-scale-up text-[#0D2533]">
+        <div class="w-14 h-14 rounded-full bg-orange-100 text-[#ef972d] flex items-center justify-center mx-auto shadow-inner">
+          <span class="material-symbols-outlined text-3xl">help_outline</span>
+        </div>
+
+        <div class="space-y-1.5">
+          <h3 class="text-base font-bold text-slate-800 uppercase tracking-wide">Xác Nhận Đặt Hàng</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Bạn có chắc chắn muốn xác nhận đặt đơn hàng này không?
+          </p>
+        </div>
+
+        <div class="flex items-center justify-center gap-3 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            @click="showFinalConfirmPopup = false"
+            class="w-1/2 py-2.5 border border-slate-300 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="button"
+            @click="handleAcceptFinalOrder"
+            class="w-1/2 py-2.5 bg-[#ef972d] hover:bg-[#d88523] text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1 uppercase tracking-wider"
+          >
+            <span class="material-symbols-outlined text-sm">done_all</span>
+            Đồng ý đặt hàng
           </button>
         </div>
       </div>
