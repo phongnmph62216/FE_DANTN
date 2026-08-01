@@ -331,8 +331,52 @@ watch(selectedColor, (newColor) => {
   }
 })
 
+const relatedProducts = ref([])
+const activeAccordion = ref(null)
+const isDescriptionExpanded = ref(false)
+
+const toggleAccordion = (name) => {
+  if (activeAccordion.value === name) {
+    activeAccordion.value = null
+  } else {
+    activeAccordion.value = name
+  }
+}
+
+const toggleDescriptionExpand = () => {
+  isDescriptionExpanded.value = !isDescriptionExpanded.value
+}
+
+const fetchRelatedProducts = async () => {
+  try {
+    const res = await api.get('/api/v1/san-pham', { params: { size: 10, trangThai: 1 } })
+    if (res.data) {
+      const list = res.data.content || res.data || []
+      relatedProducts.value = list
+        .filter(p => String(p.id) !== String(productId))
+        .slice(0, 5)
+        .map(p => ({
+          id: p.id,
+          name: sanitizeVietnamese(p.tenSanPham || ''),
+          image: formatImage(p.hinhAnh),
+          price: p.giaMin || 199000,
+          originalPrice: (p.giaMin || 199000) * 1.25
+        }))
+    }
+  } catch (err) {
+    console.error('Failed to load related products:', err)
+  }
+}
+
 onMounted(() => {
   fetchProductDetails()
+  fetchRelatedProducts()
+})
+
+watch(() => route.params.id, () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+  fetchProductDetails()
+  fetchRelatedProducts()
 })
 </script>
 
@@ -528,15 +572,234 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Description Tab -->
-    <div class="border-b border-outline-variant/30 flex justify-between items-end mb-8 pb-2">
-      <h2 class="text-title-md font-title-md text-on-background uppercase relative pb-2 font-bold">
-        Mô tả sản phẩm
-        <span class="absolute bottom-[-2px] left-0 w-full h-0.5 bg-[#ef972d]"></span>
-      </h2>
-    </div>
-    <div class="text-sm leading-relaxed text-on-surface-variant whitespace-pre-line bg-surface p-6 border border-outline-variant/30">
-      {{ product.moTa }}
+    <!-- Description & E-Commerce Spec Cards Container -->
+    <div class="mt-12 space-y-6">
+      <!-- Main Description Card with Expand/Collapse Toggle -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+        <div class="border-b border-gray-100 pb-3 flex items-center justify-between">
+          <h2 class="text-base md:text-lg font-bold text-[#0D2533] uppercase flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#ef972d]">description</span> MÔ TẢ SẢN PHẨM
+          </h2>
+        </div>
+
+        <div class="relative transition-all duration-300">
+          <div 
+            class="text-sm leading-relaxed text-gray-700 description-content font-body-md transition-all duration-300"
+            :class="isDescriptionExpanded ? '' : 'max-h-[380px] overflow-hidden relative'"
+            v-html="product.moTa"
+          ></div>
+
+          <div
+            v-if="!isDescriptionExpanded"
+            class="absolute bottom-0 left-0 w-full h-28 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none"
+          ></div>
+        </div>
+
+        <div class="text-center pt-2">
+          <button
+            @click="toggleDescriptionExpand"
+            class="inline-flex items-center gap-1.5 px-6 py-2.5 bg-gray-50 hover:bg-orange-50 text-[#ef972d] border border-orange-200 rounded-full font-bold text-xs transition-all shadow-sm cursor-pointer"
+          >
+            <span>{{ isDescriptionExpanded ? 'Thu gọn nội dung' : 'Xem thêm nội dung chi tiết' }}</span>
+            <span class="material-symbols-outlined text-base">
+              {{ isDescriptionExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- E-Commerce Detailed Spec Accordions (TokyoLife / Shopee / Uniqlo Style) -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100 overflow-hidden">
+        
+        <!-- Accordion 1: Bảng Size, Hướng dẫn sử dụng & Bảo quản -->
+        <div class="transition-colors">
+          <button
+            @click="toggleAccordion('size')"
+            class="w-full p-5 text-left font-bold text-sm text-[#0D2533] flex items-center justify-between hover:bg-gray-50/80 cursor-pointer"
+          >
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-lg bg-orange-50 text-[#ef972d] flex items-center justify-center">
+                <span class="material-symbols-outlined text-lg">straighten</span>
+              </span>
+              <span class="uppercase tracking-wide text-xs md:text-sm">BẢNG SIZE, HƯỚNG DẪN SỬ DỤNG VÀ BẢO QUẢN</span>
+            </div>
+            <span class="material-symbols-outlined text-gray-400 transition-transform duration-200" :class="activeAccordion === 'size' ? 'rotate-180 text-[#ef972d]' : ''">
+              expand_more
+            </span>
+          </button>
+          <div v-show="activeAccordion === 'size'" class="p-6 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-600 space-y-4 leading-relaxed">
+            <div>
+              <h4 class="font-bold text-gray-800 text-sm mb-2 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[#ef972d] text-base">square_foot</span>
+                Gợi ý chọn Size chuẩn Bee Stylish:
+              </h4>
+              <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs font-medium">
+                <div class="bg-white p-2.5 rounded-xl border border-gray-200">
+                  <span class="block font-bold text-[#ef972d]">Size S</span>
+                  <span class="text-[11px] text-gray-500">45 - 54kg | &lt; 1m65</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-xl border border-gray-200">
+                  <span class="block font-bold text-[#ef972d]">Size M</span>
+                  <span class="text-[11px] text-gray-500">55 - 64kg | 1m65 - 1m70</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-xl border border-gray-200">
+                  <span class="block font-bold text-[#ef972d]">Size L</span>
+                  <span class="text-[11px] text-gray-500">65 - 74kg | 1m70 - 1m75</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-xl border border-gray-200">
+                  <span class="block font-bold text-[#ef972d]">Size XL</span>
+                  <span class="text-[11px] text-gray-500">75 - 84kg | 1m75 - 1m80</span>
+                </div>
+                <div class="bg-white p-2.5 rounded-xl border border-gray-200">
+                  <span class="block font-bold text-[#ef972d]">Size XXL</span>
+                  <span class="text-[11px] text-gray-500">&gt; 85kg | &gt; 1m80</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-gray-200/60">
+              <h4 class="font-bold text-gray-800 text-sm mb-2 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[#ef972d] text-base">local_laundry_service</span>
+                Hướng dẫn bảo quản giữ màu bền lâu:
+              </h4>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>Nên giặt sản phẩm bằng tay hoặc máy giặt chế độ nhẹ với nước lạnh (dưới 30°C).</li>
+                <li>Lộn trái áo khi giặt và phơi ở nơi thoáng mát, tránh ánh nắng trực tiếp gay gắt.</li>
+                <li>Không sử dụng hóa chất tẩy rửa mạnh hoặc ngâm quá lâu trong nước tẩy.</li>
+                <li>Ủi/Là sản phẩm ở nhiệt độ trung bình (dưới 110°C), không ủi trực tiếp lên các chi tiết in/thêu.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accordion 2: Thành phần & Chất liệu -->
+        <div class="transition-colors">
+          <button
+            @click="toggleAccordion('material')"
+            class="w-full p-5 text-left font-bold text-sm text-[#0D2533] flex items-center justify-between hover:bg-gray-50/80 cursor-pointer"
+          >
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-lg bg-orange-50 text-[#ef972d] flex items-center justify-center">
+                <span class="material-symbols-outlined text-lg">texture</span>
+              </span>
+              <span class="uppercase tracking-wide text-xs md:text-sm">THÀNH PHẦN, CHẤT LIỆU CAO CẤP</span>
+            </div>
+            <span class="material-symbols-outlined text-gray-400 transition-transform duration-200" :class="activeAccordion === 'material' ? 'rotate-180 text-[#ef972d]' : ''">
+              expand_more
+            </span>
+          </button>
+          <div v-show="activeAccordion === 'material'" class="p-6 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-600 space-y-3 leading-relaxed">
+            <p class="font-semibold text-gray-800">
+              Sản phẩm được chế tác từ dòng vải cao cấp Bee Stylish độc quyền, đảm bảo độ thoáng mát & bền bỉ vượt trội.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div class="bg-white p-3 rounded-xl border border-gray-200 flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-[#ef972d] text-lg">air</span>
+                <div>
+                  <span class="font-bold text-gray-800 block text-xs">Thoáng khí cực tốt</span>
+                  <span class="text-[11px] text-gray-500">Thấm hút mồ hôi nhanh chóng, giữ cơ thể luôn khô ráo.</span>
+                </div>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-gray-200 flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-[#ef972d] text-lg">fit_screen</span>
+                <div>
+                  <span class="font-bold text-gray-800 block text-xs">Co giãn linh hoạt</span>
+                  <span class="text-[11px] text-gray-500">Sợi vải đàn hồi giúp thoải mái vận động suốt ngày dài.</span>
+                </div>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-gray-200 flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-[#ef972d] text-lg">palette</span>
+                <div>
+                  <span class="font-bold text-gray-800 block text-xs">Bền màu & Chống nhăn</span>
+                  <span class="text-[11px] text-gray-500">Công nghệ nhuộm an toàn, giữ màu tươi mới sau nhiều lần giặt.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accordion 3: Chính sách đổi trả & Bảo hành -->
+        <div class="transition-colors">
+          <button
+            @click="toggleAccordion('policy')"
+            class="w-full p-5 text-left font-bold text-sm text-[#0D2533] flex items-center justify-between hover:bg-gray-50/80 cursor-pointer"
+          >
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-lg bg-orange-50 text-[#ef972d] flex items-center justify-center">
+                <span class="material-symbols-outlined text-lg">verified_user</span>
+              </span>
+              <span class="uppercase tracking-wide text-xs md:text-sm">CHÍNH SÁCH ĐỔI TRẢ & BẢO HÀNH CAM KẾT</span>
+            </div>
+            <span class="material-symbols-outlined text-gray-400 transition-transform duration-200" :class="activeAccordion === 'policy' ? 'rotate-180 text-[#ef972d]' : ''">
+              expand_more
+            </span>
+          </button>
+          <div v-show="activeAccordion === 'policy'" class="p-6 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-600 space-y-3 leading-relaxed">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-1">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                  <span class="material-symbols-outlined text-emerald-600 text-base">published_with_changes</span>
+                  Đổi trả trong 7 ngày
+                </div>
+                <p class="text-[11px] text-gray-500">Miễn phí đổi sản phẩm trong 7 ngày nếu lỗi từ nhà sản xuất hoặc không vừa size.</p>
+              </div>
+              <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-1">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                  <span class="material-symbols-outlined text-emerald-600 text-base">local_shipping</span>
+                  Kiểm tra khi nhận hàng
+                </div>
+                <p class="text-[11px] text-gray-500">Khách hàng được quyền kiểm tra sản phẩm trước khi thanh toán cho nhân viên giao hàng.</p>
+              </div>
+              <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-1">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                  <span class="material-symbols-outlined text-emerald-600 text-base">support_agent</span>
+                  Hỗ trợ 24/7
+                </div>
+                <p class="text-[11px] text-gray-500">Đội ngũ CSKH sẵn sàng giải đáp thắc mắc và hỗ trợ xử lý mọi đơn hàng nhanh chóng.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Related Products Grid ("SẢN PHẨM TƯƠNG TỰ HOT NHẤT HÔM NAY") -->
+      <div v-if="relatedProducts.length > 0" class="mt-12 space-y-6">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#ef972d] text-2xl">local_fire_department</span>
+            <h2 class="text-base md:text-lg font-bold text-[#0D2533] uppercase">SẢN PHẨM TƯƠNG TỰ HOT NHẤT</h2>
+          </div>
+          <RouterLink to="/" class="text-xs font-bold text-[#ef972d] hover:underline flex items-center gap-0.5">
+            Xem tất cả <span class="material-symbols-outlined text-sm">chevron_right</span>
+          </RouterLink>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <RouterLink
+            v-for="item in relatedProducts"
+            :key="item.id"
+            :to="`/product/${item.id}`"
+            class="bg-white rounded-2xl border border-gray-100 p-3 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div class="aspect-square rounded-xl overflow-hidden bg-gray-50 relative mb-3 border border-gray-50">
+                <img :src="item.image" :alt="item.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <span class="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md shadow-sm">
+                  HOT
+                </span>
+              </div>
+              <h3 class="font-bold text-xs text-gray-800 line-clamp-2 group-hover:text-[#ef972d] transition-colors leading-snug">
+                {{ item.name }}
+              </h3>
+            </div>
+
+            <div class="mt-3 pt-2 border-t border-gray-50 flex items-baseline justify-between">
+              <span class="text-sm font-black text-[#ef972d]">{{ formatCurrency(item.price) }}</span>
+              <span class="text-[10px] text-gray-400 line-through font-medium">{{ formatCurrency(item.originalPrice) }}</span>
+            </div>
+          </RouterLink>
+        </div>
+      </div>
     </div>
 
     <!-- Beautiful Toast Notification Popup (Replaces Browser Alert) -->
@@ -622,5 +885,33 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Scoped styles if any */
+:deep(.description-content img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+:deep(.description-content p) {
+  margin-bottom: 12px;
+}
+:deep(.description-content ul) {
+  list-style-type: disc;
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+:deep(.description-content ol) {
+  list-style-type: decimal;
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+:deep(.description-content h1),
+:deep(.description-content h2),
+:deep(.description-content h3),
+:deep(.description-content h4) {
+  font-weight: 700;
+  color: #0D2533;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
 </style>

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../services/api'
 import { formatInputNumber, parseInputNumber, trackNewItem } from '@/utils/format'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 
 const router = useRouter()
 
@@ -1009,12 +1010,11 @@ onUnmounted(() => {
           <h2 class="text-lg font-bold text-[#0D2533] border-b border-gray-100 pb-3 flex items-center gap-2">
             <span class="material-symbols-outlined text-[#ef972d]">subject</span> Mô tả sản phẩm
           </h2>
-          <textarea
+          <RichTextEditor
             v-model="description"
-            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] transition-all text-sm outline-none"
-            placeholder="Nhập thông tin mô tả chi tiết sản phẩm..."
-            rows="5"
-          ></textarea>
+            placeholder="Nhập thông tin mô tả chi tiết sản phẩm (hỗ trợ chèn hình ảnh, định dạng văn bản, tiêu đề, danh sách...)..."
+            :height="360"
+          />
         </div>
       </div>
 

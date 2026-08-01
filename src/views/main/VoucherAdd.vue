@@ -116,22 +116,27 @@ const isCustomerSelected = (customer) => {
   return danhSachKhachHangIds.value.includes(customer.id)
 }
 
-// Mock details generator for customer statistics (since not returned in list endpoint)
-const getMockDetails = (item) => {
-  const id = item.id || 1
-  if (id > 4) {
-    return {
-      tongDon: 0,
-      tongChiTieu: '0 đ',
-      lanMuaGanNhat: '-'
+// Real customer statistics formatter (aggregates real order count, total spent, and last purchase date from backend)
+const formatCustomerStats = (item) => {
+  const tongDon = item.tongDon ?? 0
+  const tongChiTieu = formatPrice(item.tongChiTieu ?? 0)
+  
+  let lanMuaGanNhatStr = '-'
+  if (item.lanMuaGanNhat) {
+    try {
+      const date = new Date(item.lanMuaGanNhat)
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = date.getFullYear()
+      lanMuaGanNhatStr = `${day}/${month}/${year}`
+    } catch (e) {
+      lanMuaGanNhatStr = '-'
     }
   }
-  const tongDon = (id * 3) % 7
-  const tongChiTieuVal = (id * 150000) % 900000
-  const lanMuaGanNhatStr = id % 2 === 0 ? '29/04/2026' : '-'
+
   return {
-    tongDon: tongDon,
-    tongChiTieu: formatPrice(tongChiTieuVal),
+    tongDon,
+    tongChiTieu,
     lanMuaGanNhat: lanMuaGanNhatStr
   }
 }
@@ -650,13 +655,13 @@ onMounted(async () => {
                 {{ formatBirthDate(item.ngaySinh) }}
               </td>
               <td class="px-4 py-3 whitespace-nowrap font-body-md text-gray-600 text-center">
-                {{ getMockDetails(item).tongDon }}
+                {{ formatCustomerStats(item).tongDon }}
               </td>
               <td class="px-4 py-3 whitespace-nowrap font-body-md text-gray-800 text-right font-medium">
-                {{ getMockDetails(item).tongChiTieu }}
+                {{ formatCustomerStats(item).tongChiTieu }}
               </td>
               <td class="px-4 py-3 whitespace-nowrap font-body-md text-gray-600">
-                {{ getMockDetails(item).lanMuaGanNhat }}
+                {{ formatCustomerStats(item).lanMuaGanNhat }}
               </td>
             </tr>
           </tbody>

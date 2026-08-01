@@ -91,10 +91,15 @@ const triggerSendEmailReportDirect = async () => {
 
   isSendingEmail.value = true
   try {
-    const realRevenue = overviewData.value?.homNay?.doanhThu ?? 0
-    const realOrders = overviewData.value?.homNay?.soDonHang ?? 0
-    const realCompleted = overviewData.value?.homNay?.hoanThanh ?? 0
-    const realProducts = overviewData.value?.homNay?.soSanPhamDaBan ?? 0
+    const rType = emailReportType.value || 'today'
+    let selectedPeriod = overviewData.value?.homNay
+    if (rType === 'week') selectedPeriod = overviewData.value?.tuanNay
+    if (rType === 'month') selectedPeriod = overviewData.value?.thangNay
+
+    const realRevenue = selectedPeriod?.doanhThu ?? 0
+    const realOrders = selectedPeriod?.soDonHang ?? 0
+    const realCompleted = selectedPeriod?.hoanThanh ?? 0
+    const realProducts = selectedPeriod?.soSanPhamDaBan ?? 0
     const realCash = detailsData.value?.thongKeTien?.tienMat ?? 0
     const realTransfer = detailsData.value?.thongKeTien?.chuyenKhoan ?? 0
     const realVnpay = detailsData.value?.thongKeTien?.vnpay ?? 0
@@ -104,7 +109,7 @@ const triggerSendEmailReportDirect = async () => {
     // Call Backend API Endpoint
     await api.post('/api/v1/thong-ke/send-email-report', {
       email: targetEmail,
-      type: emailReportType.value || 'today',
+      type: rType,
       doanhThu: realRevenue,
       soDonHang: realOrders,
       hoanThanh: realCompleted,
@@ -112,15 +117,12 @@ const triggerSendEmailReportDirect = async () => {
       tienMat: realCash,
       chuyenKhoan: realTransfer,
       vnpay: realVnpay
-    }).catch(err => {
-      console.warn('Backend email API trigger logged:', err)
     })
     
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    showToast(`Đã gửi báo cáo Doanh Thu Hôm Nay (${formatCurrency(realRevenue)}) thành công tới Email: ${targetEmail}!`, 'success')
+    showToast(`Đã gửi báo cáo Doanh Thu (${formatCurrency(realRevenue)}) thành công tới Email: ${targetEmail}!`, 'success')
     showEmailModal.value = false
   } catch (e) {
+    console.error('Error sending email report:', e)
     showToast('Có lỗi xảy ra khi gửi email báo cáo!', 'error')
   } finally {
     isSendingEmail.value = false
@@ -203,139 +205,32 @@ const formatImage = (url) => {
   return `${apiBase.replace(/\/$/, '')}/${url.replace(/^\//, '')}`
 }
 
-// Combined Fetch Function: Syncs Backend Statistics API + DB Invoices List in Local Timezone
-// REVENUE RULE STRICTLY MATCHES INVOICE LIST (trangThai === 4: ĐÃ HOÀN THÀNH)
+// Combined Fetch Function: Syncs Backend Statistics API
 const fetchOverviewAndDetails = async () => {
   loadingOverview.value = true
   loadingDetails.value = true
 
   try {
-    const [overviewRes, detailsRes, invoicesRes] = await Promise.all([
+    const tuNgayStr = `${startDate.value}T00:00:00`
+    const denNgayStr = `${endDate.value}T23:59:59`
+
+    const [overviewRes, detailsRes] = await Promise.all([
       api.get('/api/v1/thong-ke/tong-quan').catch(() => null),
-      api.get(`/api/v1/thong-ke/chi-tiet?tuNgay=${startDate.value}T00:00:00&denNgay=${endDate.value}T23:59:59&tuGio=${startTime.value}&denGio=${endTime.value}`).catch(() => null),
-      api.get('/api/v1/hoa-don', { params: { size: 1000 } }).catch(() => null)
+      api.get(`/api/v1/thong-ke/chi-tiet?tuNgay=${tuNgayStr}&denNgay=${denNgayStr}&tuGio=${startTime.value || '00:00:00'}&denGio=${endTime.value || '23:59:59'}`).catch(() => null)
     ])
 
-    let rawInvoices = []
-    if (invoicesRes && invoicesRes.data) {
-      rawInvoices = invoicesRes.data.content || invoicesRes.data || []
+    if (overviewRes && overviewRes.data) {
+      overviewData.value = overviewRes.data
     }
 
-    // Local Browser Timezone Ranges for 100% Accuracy
-    const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-
-    const dayOfWeek = now.getDay()
-    const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek)
-    const mondayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday, 0, 0, 0)
-
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0)
-    const yearStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0)
-
-    const statsFromInvoices = {
-      homNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
-      tuanNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
-      thangNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 },
-      namNay: { doanhThu: 0, soSanPhamDaBan: 0, soDonHang: 0, hoanThanh: 0, huy: 0, dangXuLy: 0 }
-    }
-
-    let realTienMat = 0
-    let realChuyenKhoan = 0
-    let realVnpay = 0
-
-    const orderStatusCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    const topProdMap = {}
-    const topCustomerMap = {}
-
-    rawInvoices.forEach(inv => {
-      const invDate = parseDateRobust(inv.ngayTao || inv.createdDate || inv.thoiGian || inv.ngayThanhToan)
-      const amount = Number(inv.tongTienSauGiam || inv.tongTien || inv.thanhTien || 0)
-      const status = inv.trangThai !== undefined ? Number(inv.trangThai) : 4
-      const itemsCount = inv.danhSachChiTiet ? inv.danhSachChiTiet.reduce((s, d) => s + (d.soLuong || 1), 0) : (inv.soLuong || 1)
-
-      if (orderStatusCounts[status] !== undefined) {
-        orderStatusCounts[status]++
-      }
-
-      // REVENUE INCLUSION RULE: ONLY STATUS === 4 (ĐÃ HOÀN THÀNH / HÓA ĐƠN THÀNH CÔNG) COUNTS TOWARDS REVENUE TO MATCH INVOICE LIST
-      const isCompleted = (status === 4)
-      const isCanceled = (status === 5 || status === 6)
-      const isProcessing = (status === 0 || status === 1 || status === 2 || status === 3)
-
-      if (isCompleted) {
-        // Payment channel breakdown ONLY for completed invoices
-        const pMethod = String(inv.phuongThucThanhToan || inv.hinhThucThanhToan || inv.loaiThanhToan || inv.tenPhuongThuc || '').toLowerCase()
-        if (pMethod.includes('chuyển khoản') || pMethod.includes('chuyen khoan') || pMethod.includes('transfer') || pMethod === '1') {
-          realChuyenKhoan += amount
-        } else if (pMethod.includes('vnpay') || pMethod === '2') {
-          realVnpay += amount
-        } else {
-          realTienMat += amount
-        }
-
-        // Top Customer stats
-        const custName = inv.tenKhachHang || inv.khachHang || 'Khách lẻ'
-        if (custName !== 'Khách lẻ') {
-          if (!topCustomerMap[custName]) {
-            topCustomerMap[custName] = { hoTen: custName, sdt: inv.soDienThoaiKhachHang || inv.sdtKhachHang || '-', soDon: 0, tongChiTieu: 0 }
-          }
-          topCustomerMap[custName].soDon += 1
-          topCustomerMap[custName].tongChiTieu += amount
-        }
-
-        // Top Products stats
-        if (inv.danhSachChiTiet && Array.isArray(inv.danhSachChiTiet)) {
-          inv.danhSachChiTiet.forEach(dt => {
-            const pName = dt.tenSanPham || 'Sản phẩm'
-            if (!topProdMap[pName]) {
-              topProdMap[pName] = { tenSanPham: pName, soLuongDaBan: 0, doanhThu: 0, hinhAnh: dt.hinhAnh || '', ton: dt.tonKho || 50 }
-            }
-            topProdMap[pName].soLuongDaBan += (dt.soLuong || 1)
-            topProdMap[pName].doanhThu += (dt.thanhTien || dt.donGia * dt.soLuong || 0)
-          })
-        }
-      }
-
-      if (invDate && !isNaN(invDate.getTime())) {
-        const checkCategory = (key, startTimeThreshold) => {
-          if (invDate >= startTimeThreshold) {
-            // Count invoices in Quản lý Hóa đơn (Completed or Canceled)
-            if (isCompleted || isCanceled) {
-              statsFromInvoices[key].soDonHang += 1
-            }
-            if (isCompleted) {
-              statsFromInvoices[key].doanhThu += amount
-              statsFromInvoices[key].soSanPhamDaBan += itemsCount
-              statsFromInvoices[key].hoanThanh += 1
-            }
-            if (isCanceled) statsFromInvoices[key].huy += 1
-            if (isProcessing) statsFromInvoices[key].dangXuLy += 1
-          }
-        }
-
-        checkCategory('homNay', todayStart)
-        checkCategory('tuanNay', mondayStart)
-        checkCategory('thangNay', monthStart)
-        checkCategory('namNay', yearStart)
-      }
-    })
-
-    // Strict Sync: Use DB calculation for 100% Accuracy on Invoices
-    overviewData.value = statsFromInvoices
-
-    const topCustList = Object.values(topCustomerMap).sort((a, b) => b.tongChiTieu - a.tongChiTieu)
-    const topProdList = Object.values(topProdMap).sort((a, b) => b.soLuongDaBan - a.soLuongDaBan)
-    detailsData.value = {
-      topBanChay: topProdList.slice(0, 10),
-      topKhachHang: topCustList.slice(0, 5),
-      banChamTonKho: [],
-      trangThaiDonHang: orderStatusCounts,
-      sanPhamDaBan: topProdList,
-      thongKeTien: {
-        tienMat: realTienMat,
-        chuyenKhoan: realChuyenKhoan,
-        vnpay: realVnpay,
-        tongTien: realTienMat + realChuyenKhoan + realVnpay
+    if (detailsRes && detailsRes.data) {
+      detailsData.value = {
+        topBanChay: detailsRes.data.topBanChay || [],
+        topKhachHang: detailsRes.data.topKhachHang || [],
+        banChamTonKho: detailsRes.data.banChamTonKho || [],
+        trangThaiDonHang: detailsRes.data.trangThaiDonHang || {},
+        sanPhamDaBan: detailsRes.data.sanPhamDaBan || [],
+        thongKeTien: detailsRes.data.thongKeTien || { tienMat: 0, chuyenKhoan: 0, vnpay: 0, tongTien: 0 }
       }
     }
   } catch (err) {

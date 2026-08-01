@@ -5,6 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import JSZip from 'jszip'
 import api from '../../services/api'
 import { formatInputNumber, parseInputNumber, sortNewestAtTop } from '@/utils/format'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 
 const router = useRouter()
 
@@ -846,8 +847,8 @@ const fetchProductVariants = async (productId) => {
       productVariants.value = res.data.content.map(v => ({
         id: v.id,
         anh: v.anh || '',
-        tenKichCo: sanitizeVietnamese(v.tenKichThuoc || ''),
-        tenMauSac: sanitizeVietnamese(v.tenMauSac || ''),
+        tenKichCo: sanitizeVietnamese(v.tenKichCo || v.tenKichThuoc || ''),
+        tenMauSac: sanitizeVietnamese(v.tenMauSac || v.tenMau || ''),
         soLuongTon: v.soLuongTon ?? 0,
         giaNhap: v.giaNhap ?? 0,
         giaBan: v.giaBan ?? 0,
@@ -1332,12 +1333,11 @@ onMounted(() => {
             <!-- Row 2: Description -->
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">Mô tả sản phẩm</label>
-              <textarea
-                rows="3"
+              <RichTextEditor
                 v-model="editForm.moTa"
-                placeholder="Nhập mô tả chi tiết sản phẩm..."
-                class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ef972d]/20 focus:border-[#ef972d] outline-none text-sm resize-none transition-all"
-              ></textarea>
+                placeholder="Nhập mô tả chi tiết sản phẩm (hỗ trợ chèn hình ảnh, định dạng văn bản, tiêu đề...)..."
+                :height="300"
+              />
             </div>
 
             <!-- Row 3: 8 Attribute Dropdowns Grid -->
