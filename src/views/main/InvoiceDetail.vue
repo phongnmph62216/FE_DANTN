@@ -330,7 +330,6 @@ const availableTransitionOptions = computed(() => {
       options.push({ value: 5, label: 'Đã hủy' })
     } else if (current === 3) {
       options.push({ value: 4, label: 'Đã hoàn thành' })
-      options.push({ value: 5, label: 'Đã hủy' })
       options.push({ value: 6, label: 'Giao hàng không thành công' })
     }
   }

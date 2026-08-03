@@ -550,7 +550,7 @@ onMounted(() => {
               
               <!-- Actions Box: Show Cancel Button for Pending Orders -->
               <div 
-                v-if="(selectedOrder.trangThai === 0 || selectedOrder.trangThai === 1) && selectedOrder.trangThaiYeuCauHuy !== 1" 
+                v-if="(selectedOrder.trangThai === 0 || selectedOrder.trangThai === 1 || selectedOrder.trangThai === 2) && selectedOrder.trangThaiYeuCauHuy !== 1" 
                 class="pt-1"
               >
                 <button 
