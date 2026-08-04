@@ -47,7 +47,7 @@ const getStatusLabel = (status) => {
   switch (status) {
     case 0: return 'Chờ xác nhận'
     case 1: return 'Đang xử lý'
-    case 2: return 'Đã giao'
+    case 2: return 'Chờ giao'
     case 3: return 'Đang giao'
     case 4: return 'Hoàn thành'
     case 5: return 'Đã hủy'

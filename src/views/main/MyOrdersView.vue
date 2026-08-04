@@ -30,8 +30,8 @@ const tabs = [
   { id: 'all', label: 'Tất cả' },
   { id: '0', label: 'Chờ xác nhận' },
   { id: '1', label: 'Đang xử lý' },
+  { id: '2', label: 'Chờ giao' },
   { id: '3', label: 'Đang giao' },
-  { id: '2', label: 'Đã giao' },
   { id: '4', label: 'Hoàn thành' },
   { id: '5', label: 'Đã hủy' },
   { id: '6', label: 'Giao thất bại' }
@@ -103,7 +103,7 @@ const getStatusLabel = (status) => {
   switch (status) {
     case 0: return 'Chờ xác nhận'
     case 1: return 'Đang xử lý' // Đã xác nhận
-    case 2: return 'Đã giao' // Chờ giao
+    case 2: return 'Chờ giao'
     case 3: return 'Đang giao'
     case 4: return 'Hoàn thành'
     case 5: return 'Đã hủy'
