@@ -1,1 +1,257 @@
 @import "tailwindcss";
+
+@theme {
+  --color-surface-dim: #cbdbf5;
+  --color-secondary: #4b6171;
+  --color-inverse-surface: #0D2533;
+  --color-secondary-fixed-dim: #b2cadc;
+  --color-on-secondary-container: #516777;
+  --color-error: #ba1a1a;
+  --color-inverse-on-surface: #eaf1ff;
+  --color-surface-bright: #ffffff;
+  --color-on-secondary-fixed: #051e2c;
+  --color-surface-variant: #d3e4fe;
+  --color-on-primary-fixed-variant: #a16110;
+  --color-on-tertiary-fixed: #001f2a;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-surface: #0b1c30;
+  --color-primary-fixed-dim: #ffb86f;
+  --color-tertiary-container: #19b8ec;
+  --color-primary-fixed: #ffdcbd;
+  --color-surface-container-low: #eff4ff;
+  --color-on-secondary-fixed-variant: #334959;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-primary-container: #ef972d;
+  --color-primary: #ef972d;
+  --color-surface-container-highest: #d3e4fe;
+  --color-tertiary: #006685;
+  --color-on-primary-fixed: #ffffff;
+  --color-on-surface-variant: #534435;
+  --color-secondary-fixed: #cee6f9;
+  --color-on-background: #0b1c30;
+  --color-surface-tint: #ef972d;
+  --color-outline-variant: #d9c3b0;
+  --color-on-tertiary-container: #00455b;
+  --color-inverse-primary: #ffb86f;
+  --color-tertiary-fixed: #bfe9ff;
+  --color-on-primary-container: #ffffff;
+  --color-surface-container-high: #dce9ff;
+  --color-outline: #867463;
+  --color-surface: #ffffff;
+  --color-background: #ffffff;
+  --color-on-secondary: #ffffff;
+  --color-surface-container: #e5eeff;
+  --color-on-tertiary-fixed-variant: #004d65;
+  --color-tertiary-fixed-dim: #6dd2ff;
+  --color-on-error-container: #93000a;
+  --color-on-primary: #ffffff;
+  --color-on-tertiary: #ffffff;
+  --color-secondary-container: #cee6f9;
+
+  --spacing-stack-md: 12px;
+  --spacing-stack-lg: 24px;
+  --spacing-container-padding: 24px;
+  --spacing-gutter: 16px;
+  --spacing-base: 8px;
+  --spacing-sidebar-width: 260px;
+  --spacing-stack-sm: 4px;
+  --spacing-margin-mobile: 20px;
+  --spacing-margin-desktop: 40px;
+  --spacing-section-gap: 80px;
+  --spacing-container-max: 1440px;
+
+  --font-headline-md: "Hanken Grotesk", sans-serif;
+  --font-label-sm: "Hanken Grotesk", sans-serif;
+  --font-display-lg-mobile: "Hanken Grotesk", sans-serif;
+  --font-body-lg: "Hanken Grotesk", sans-serif;
+  --font-display-lg: "Hanken Grotesk", sans-serif;
+  --font-body-md: "Hanken Grotesk", sans-serif;
+
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 600;
+
+  --text-label-sm: 12px;
+  --text-label-sm--line-height: 16px;
+  --text-label-sm--letter-spacing: 0.05em;
+  --text-label-sm--font-weight: 600;
+
+  --text-display-lg-mobile: 24px;
+  --text-display-lg-mobile--line-height: 32px;
+  --text-display-lg-mobile--letter-spacing: -0.01em;
+  --text-display-lg-mobile--font-weight: 700;
+
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+
+  --text-display-lg: 32px;
+  --text-display-lg--line-height: 40px;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 700;
+
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+}
+
+body {
+  font-family: 'Hanken Grotesk', sans-serif;
+}
+
+/* --- PREMIUM GLOBAL TOAST STYLING --- */
+/* Target the toast card itself, whether it is the outer container or the inner nested container */
+
+/* Success Toasts */
+div.fixed.bottom-5.right-5[class*="emerald"],
+div.fixed.bottom-5.right-5[class*="green"],
+div.fixed.bottom-5.right-5[class*="teal"],
+div.fixed.bottom-5.right-5 > div[class*="emerald"],
+div.fixed.bottom-5.right-5 > div[class*="green"],
+div.fixed.bottom-5.right-5 > div[class*="teal"] {
+  background: #00B67A !important; /* Vibrant Emerald Green from request */
+  color: #ffffff !important;
+  border-radius: 9999px !important; /* Pill style */
+  padding: 12px 24px !important;
+  box-shadow: 0 10px 30px rgba(0, 182, 122, 0.3) !important;
+  border: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+/* Error Toasts */
+div.fixed.bottom-5.right-5[class*="red"],
+div.fixed.bottom-5.right-5[class*="rose"],
+div.fixed.bottom-5.right-5 > div[class*="red"],
+div.fixed.bottom-5.right-5 > div[class*="rose"] {
+  background: #F1416C !important; /* Premium Rose Red */
+  color: #ffffff !important;
+  border-radius: 9999px !important; /* Pill style */
+  padding: 12px 24px !important;
+  box-shadow: 0 10px 30px rgba(241, 65, 108, 0.3) !important;
+  border: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+/* Warning Toasts */
+div.fixed.bottom-5.right-5[class*="amber"],
+div.fixed.bottom-5.right-5[class*="orange"],
+div.fixed.bottom-5.right-5 > div[class*="amber"],
+div.fixed.bottom-5.right-5 > div[class*="orange"] {
+  background: #EF972D !important; /* Vibrant Orange */
+  color: #ffffff !important;
+  border-radius: 9999px !important; /* Pill style */
+  padding: 12px 24px !important;
+  box-shadow: 0 10px 30px rgba(239, 151, 45, 0.3) !important;
+  border: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+/* Info Toasts */
+div.fixed.bottom-5.right-5[class*="blue"],
+div.fixed.bottom-5.right-5 > div[class*="blue"] {
+  background: #009EF7 !important; /* Vibrant Blue */
+  color: #ffffff !important;
+  border-radius: 9999px !important; /* Pill style */
+  padding: 12px 24px !important;
+  box-shadow: 0 10px 30px rgba(0, 158, 247, 0.3) !important;
+  border: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+/* Target all text elements and icons inside the toast to be white */
+div.fixed.bottom-5.right-5 span,
+div.fixed.bottom-5.right-5 p,
+div.fixed.bottom-5.right-5 button,
+div.fixed.bottom-5.right-5 h4,
+div.fixed.bottom-5.right-5 div {
+  color: #ffffff !important;
+}
+
+/* Make sure the text elements inside are font-semibold */
+div.fixed.bottom-5.right-5 span,
+div.fixed.bottom-5.right-5 p {
+  font-weight: 600 !important;
+}
+
+/* Close button styling */
+div.fixed.bottom-5.right-5 button {
+  opacity: 0.8 !important;
+  cursor: pointer !important;
+  transition: opacity 0.2s ease !important;
+}
+div.fixed.bottom-5.right-5 button:hover {
+  opacity: 1 !important;
+}
+
+/* Card clickability */
+div.fixed.bottom-5.right-5[class*="emerald"],
+div.fixed.bottom-5.right-5[class*="green"],
+div.fixed.bottom-5.right-5[class*="teal"],
+div.fixed.bottom-5.right-5[class*="red"],
+div.fixed.bottom-5.right-5[class*="rose"],
+div.fixed.bottom-5.right-5[class*="amber"],
+div.fixed.bottom-5.right-5[class*="orange"],
+div.fixed.bottom-5.right-5[class*="blue"],
+div.fixed.bottom-5.right-5 > div {
+  pointer-events: auto !important;
+}
+
+/* Global Dark Mode Styling */
+html.dark {
+  color-scheme: dark;
+  background-color: #0b1c30 !important;
+  color: #eaf1ff !important;
+  filter: invert(0.92) hue-rotate(180deg);
+}
+
+html.dark img,
+html.dark video,
+html.dark canvas,
+html.dark iframe,
+html.dark .material-symbols-outlined,
+html.dark [style*="background-image"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* --- PREMIUM HARMONIOUS CUSTOM SCROLLBAR --- */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #ef972d;
+}
