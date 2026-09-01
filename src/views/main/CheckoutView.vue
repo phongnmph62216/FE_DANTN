@@ -1296,7 +1296,10 @@ onMounted(async () => {
                         <img class="w-10 h-12 object-cover rounded bg-slate-100 flex-shrink-0" :src="item.image" alt="Product image"/>
                         <div>
                           <div class="font-semibold text-slate-800 uppercase text-xs line-clamp-1">{{ item.productName }}</div>
-                          <div class="text-[11px] text-slate-500 mt-0.5">Size {{ item.size }} / {{ item.color }}</div>
+                          <div class="text-[11px] text-slate-500 mt-0.5">
+                            <span v-if="item.productCode || item.variantCode" class="font-mono text-slate-500 mr-2">Mã: {{ item.productCode || item.variantCode }}</span>
+                            <span>Size {{ item.size }} / {{ item.color }}</span>
+                          </div>
                         </div>
                       </div>
                     </td>

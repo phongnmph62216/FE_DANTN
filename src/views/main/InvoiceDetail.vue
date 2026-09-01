@@ -161,6 +161,32 @@ const getPaymentMethod = computed(() => {
   return 'Tiền mặt'
 })
 
+// Helper to format currency numbers inside text/notes (e.g. "Khách trả: 88000.00" -> "Khách trả: 88.000 đ")
+const formatLogNote = (note) => {
+  if (!note) return ''
+  let text = String(note)
+
+  // 1. Replace patterns like "Khách trả: 88000.00", "Khách trả: 88000", "Tiền thừa: 12000.00", "Thanh toán: 100000"
+  text = text.replace(/(Khách trả|Tiền thừa|Thanh toán|Tổng tiền|Tiền mặt|Chuyển khoản|Đơn giá):?\s*(\d+(\.\d+)?)/gi, (match, label, numStr) => {
+    const val = parseFloat(numStr)
+    if (!isNaN(val)) {
+      return `${label}: ${formatPriceVND(val)}`
+    }
+    return match
+  })
+
+  // 2. Replace standalone float decimal numbers like "88000.00" or "100000.00"
+  text = text.replace(/(\d{4,10})\.00/g, (match, numStr) => {
+    const val = parseFloat(numStr)
+    if (!isNaN(val)) {
+      return formatPriceVND(val)
+    }
+    return match
+  })
+
+  return text
+}
+
 // Product List
 const getProducts = computed(() => {
   if (!detail.value) return []
@@ -290,6 +316,26 @@ const loadInvoiceDetails = async () => {
 
     detail.value = detailRes.data
     historyLogs.value = historyRes.data || []
+
+    // Enrich product list with original price (giaGoc) if missing or equal to donGia
+    const prods = detail.value?.danhSachSanPham || detail.value?.sanPhams || detail.value?.hoaDonChiTiets || []
+    if (prods && prods.length > 0) {
+      await Promise.all(prods.map(async (item) => {
+        const vId = item.idChiTietSanPham || item.idChiTiet || item.chiTietSanPhamId
+        if (vId) {
+          try {
+            const vRes = await api.get(`/api/v1/chi-tiet-san-pham/${vId}`).catch(() => null)
+            if (vRes && vRes.data && vRes.data.giaBan) {
+              const origPrice = Number(vRes.data.giaBan)
+              const currentPrice = Number(item.donGiaSauGiam || item.donGia || item.price || 0)
+              if (origPrice > currentPrice) {
+                item.giaGoc = origPrice
+              }
+            }
+          } catch (e) {}
+        }
+      }))
+    }
   } catch (err) {
     console.error('Failed to load invoice detailed data:', err)
     isError.value = true
@@ -657,9 +703,9 @@ onMounted(() => {
             <span class="font-body-md text-body-md text-on-surface-variant">Số điện thoại</span>
             <span class="font-body-md text-body-md text-on-background">{{ getCustomerPhone }}</span>
           </div>
-          <div class="flex justify-between items-center pb-1">
-            <span class="font-body-md text-body-md text-on-surface-variant">Email</span>
-            <span class="font-body-md text-body-md text-on-background truncate max-w-[200px]" :title="getCustomerEmail">
+          <div class="flex justify-between items-center pb-1 gap-4">
+            <span class="font-body-md text-body-md text-on-surface-variant shrink-0">Email</span>
+            <span class="font-body-md text-body-md text-on-background text-right break-all">
               {{ getCustomerEmail }}
             </span>
           </div>
@@ -673,9 +719,9 @@ onMounted(() => {
           <h2 class="font-headline-md text-headline-md text-on-background">Thông tin giao hàng</h2>
         </div>
         <div class="flex flex-col gap-4">
-          <div class="flex justify-between items-center border-b border-surface-container-high pb-3">
-            <span class="font-body-md text-body-md text-on-surface-variant">Địa chỉ</span>
-            <span class="font-body-md text-body-md text-on-background text-right pl-4 truncate max-w-[200px]" :title="getDeliveryAddress">
+          <div class="flex justify-between items-start border-b border-surface-container-high pb-3 gap-4">
+            <span class="font-body-md text-body-md text-on-surface-variant shrink-0">Địa chỉ</span>
+            <span class="font-body-md text-body-md text-on-background text-right leading-snug break-words">
               {{ getDeliveryAddress }}
             </span>
           </div>
@@ -685,9 +731,9 @@ onMounted(() => {
               {{ getOrderType === 0 ? 'Tại quầy' : (getOrderType === 1 ? 'Giao hàng' : 'Online') }}
             </span>
           </div>
-          <div class="flex justify-between items-center pb-1">
-            <span class="font-body-md text-body-md text-on-surface-variant">Ghi chú</span>
-            <span class="font-body-md text-body-md text-on-surface-variant text-right pl-4 truncate max-w-[200px]" :title="getInvoiceNote">
+          <div class="flex justify-between items-start pb-1 gap-4">
+            <span class="font-body-md text-body-md text-on-surface-variant shrink-0">Ghi chú</span>
+            <span class="font-body-md text-body-md text-on-surface-variant text-right leading-snug break-words">
               {{ getInvoiceNote }}
             </span>
           </div>
@@ -714,7 +760,7 @@ onMounted(() => {
               {{ formatDateTime(pay.thoiGian) }} • {{ pay.nguoiThucHien }}
             </span>
             <span v-if="pay.ghiChu" class="text-[11px] text-gray-400 italic block mt-0.5">
-              "{{ pay.ghiChu }}"
+              "{{ formatLogNote(pay.ghiChu) }}"
             </span>
           </div>
         </div>
@@ -768,7 +814,12 @@ onMounted(() => {
                   {{ item.soLuong || 0 }}
                 </td>
                 <td class="py-4 px-4 font-body-md text-body-md text-on-background text-right">
-                  {{ formatPriceVND(item.donGiaSauGiam || item.donGia || item.price) }}
+                  <div v-if="(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) && Number(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) > Number(item.donGiaSauGiam || item.donGia || item.price)" class="text-xs text-gray-400 line-through font-normal mb-0.5">
+                    {{ formatPriceVND(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) }}
+                  </div>
+                  <div class="font-semibold text-primary">
+                    {{ formatPriceVND(item.donGiaSauGiam || item.donGia || item.price) }}
+                  </div>
                 </td>
                 <td class="py-4 px-4 font-body-md text-body-md text-primary-container font-semibold text-right">
                   {{ formatPriceVND((item.donGiaSauGiam || item.donGia || item.price) * (item.soLuong || 0)) }}
@@ -910,7 +961,7 @@ onMounted(() => {
               
               <!-- Remark box -->
               <div v-if="log.ghiChu || log.notes" class="text-xs bg-gray-50 border border-gray-100 rounded-lg p-2.5 mt-2 text-on-surface-variant leading-relaxed italic">
-                "{{ log.ghiChu || log.notes }}"
+                "{{ formatLogNote(log.ghiChu || log.notes) }}"
               </div>
             </div>
           </div>
@@ -1072,7 +1123,12 @@ onMounted(() => {
             </div>
           </td>
           <td class="py-4 px-4 text-center">{{ item.soLuong || 0 }}</td>
-          <td class="py-4 px-4 text-right">{{ formatPriceVND(item.donGiaSauGiam || item.donGia) }}</td>
+          <td class="py-4 px-4 text-right">
+            <div v-if="(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) && Number(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) > Number(item.donGiaSauGiam || item.donGia)" class="text-xs text-gray-400 line-through">
+              {{ formatPriceVND(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) }}
+            </div>
+            <div>{{ formatPriceVND(item.donGiaSauGiam || item.donGia) }}</div>
+          </td>
           <td class="py-4 pl-4 text-right font-semibold text-black">
             {{ formatPriceVND((item.donGiaSauGiam || item.donGia) * (item.soLuong || 0)) }}
           </td>

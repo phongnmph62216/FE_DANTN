@@ -934,10 +934,10 @@ const getImageUrl = (url) => {
       :class="sidebarExpanded ? 'ml-[260px]' : 'ml-[80px]'"
       class="flex-1 flex flex-col min-h-screen relative transition-all duration-300 ease-in-out"
     >
-      <!-- TopNavBar -->
-      <header
-        :class="sidebarExpanded ? 'w-[calc(100%-260px)]' : 'w-[calc(100%-80px)]'"
-        class="fixed top-0 right-0 h-16 bg-surface-container-lowest flex items-center justify-end px-container-padding z-10 border-b border-surface-container shadow-sm transition-all duration-300 ease-in-out"
+      <!-- Top Navigation Header Bar -->
+      <header 
+        :style="{ left: sidebarExpanded ? 'var(--spacing-sidebar-width)' : '80px' }"
+        class="fixed top-0 right-0 h-16 bg-surface-container-lowest flex items-center justify-end px-container-padding z-50 border-b border-surface-container shadow-sm transition-all duration-300 ease-in-out"
       >
         <div class="flex items-center gap-6">
           <!-- Actions -->
@@ -960,33 +960,34 @@ const getImageUrl = (url) => {
             <div 
               v-if="showNotificationsPanel"
               @click.stop
-              class="absolute right-0 top-12 w-80 bg-surface border border-outline-variant/30 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-96"
+              class="absolute right-0 top-12 w-80 bg-surface border border-outline-variant/30 rounded-2xl shadow-2xl z-[1001] overflow-hidden text-on-surface divide-y divide-outline-variant/20"
             >
-              <div class="p-4 bg-surface border-b border-outline-variant/30 flex justify-between items-center">
-                <span class="font-bold text-sm text-on-surface flex items-center gap-1.5">
-                  <span class="material-symbols-outlined text-[18px]">notifications</span>
-                  Thông báo ({{ unreadCount }})
-                </span>
+              <!-- Header -->
+              <div class="p-3 bg-surface-variant/20 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-primary text-sm">notifications</span>
+                  <h4 class="font-bold text-xs text-on-surface">Thông báo mới nhất</h4>
+                </div>
                 <button 
-                  v-if="unreadCount > 0"
-                  @click="markAllAsRead"
-                  class="text-xs text-primary hover:underline font-semibold cursor-pointer"
+                  v-if="unreadCount > 0" 
+                  @click="handleMarkAllAsRead" 
+                  class="text-[10px] text-primary hover:underline font-semibold cursor-pointer"
                 >
                   Đánh dấu đã đọc
                 </button>
               </div>
 
               <!-- List -->
-              <div class="overflow-y-auto flex-1 divide-y divide-outline-variant/20 scrollbar-thin max-h-80">
-                <div v-if="notifications.length === 0" class="p-6 text-center text-xs text-on-surface-variant">
-                  Không có thông báo nào.
+              <div class="max-h-72 overflow-y-auto divide-y divide-outline-variant/10 custom-scrollbar">
+                <div v-if="notifications.length === 0" class="p-6 text-center text-xs text-on-surface-variant/70">
+                  Không có thông báo mới nào
                 </div>
                 <div 
                   v-for="notif in notifications" 
                   :key="notif.id"
                   @click="handleNotificationClick(notif)"
-                  class="p-3.5 hover:bg-surface-container-low transition-colors cursor-pointer flex gap-3 items-start group/item relative"
-                  :class="{ 'bg-surface-container-lowest': notif.trangThai === 0 }"
+                  class="p-3 hover:bg-surface-container-low transition-colors cursor-pointer flex items-start gap-2.5 relative group/item"
+                  :class="{ 'bg-primary/5': notif.trangThai === 0 }"
                 >
                   <div class="mt-1.5 flex-shrink-0">
                     <span 
@@ -1050,7 +1051,7 @@ const getImageUrl = (url) => {
             <div 
               v-if="showUserDropdown"
               @click.stop
-              class="absolute right-0 top-12 w-64 bg-surface border border-outline-variant/30 rounded-2xl shadow-2xl z-50 overflow-hidden text-on-surface py-2 divide-y divide-outline-variant/20"
+              class="absolute right-0 top-12 w-64 bg-surface border border-outline-variant/30 rounded-2xl shadow-2xl z-[1001] overflow-hidden text-on-surface py-2 divide-y divide-outline-variant/20"
             >
               <div class="px-4 py-3 bg-surface-variant/20">
                 <p class="font-bold text-sm text-on-surface line-clamp-1">{{ authStore.user?.hoTen || 'Quản trị viên' }}</p>
@@ -1063,7 +1064,7 @@ const getImageUrl = (url) => {
                   class="w-full text-left px-4 py-2.5 hover:bg-surface-container-low transition-colors flex items-center gap-3 text-xs font-bold text-on-surface cursor-pointer"
                 >
                   <span class="material-symbols-outlined text-[#EF972D] text-lg">person</span>
-                  <span>👤 Thông tin cá nhân (Hồ sơ)</span>
+                  <span>Thông tin cá nhân (Hồ sơ)</span>
                 </button>
 
                 <button 
@@ -1071,7 +1072,7 @@ const getImageUrl = (url) => {
                   class="w-full text-left px-4 py-2.5 hover:bg-surface-container-low transition-colors flex items-center gap-3 text-xs font-bold text-on-surface cursor-pointer"
                 >
                   <span class="material-symbols-outlined text-[#EF972D] text-lg">lock_reset</span>
-                  <span>🔑 Đổi mật khẩu</span>
+                  <span>Đổi mật khẩu</span>
                 </button>
 
                 <button 
@@ -1079,7 +1080,7 @@ const getImageUrl = (url) => {
                   class="w-full text-left px-4 py-2.5 hover:bg-surface-container-low transition-colors flex items-center gap-3 text-xs font-bold text-on-surface cursor-pointer"
                 >
                   <span class="material-symbols-outlined text-[#EF972D] text-lg">settings</span>
-                  <span>⚙️ Cài đặt</span>
+                  <span>Cài đặt</span>
                 </button>
               </div>
 

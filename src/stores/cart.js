@@ -38,14 +38,19 @@ export const useCartStore = defineStore('cart', {
       const existing = this.items.find(item => (item.variantId || item.id) === vId)
       if (existing) {
         const currentQty = existing.quantity || 1
-        const maxStock = existing.stock || 999
+        const maxStock = newItem.stock || existing.stock || 999
         existing.quantity = Math.min(maxStock, currentQty + quantityToAdd)
+        if (newItem.price !== undefined) existing.price = newItem.price
+        if (newItem.originalPrice !== undefined) existing.originalPrice = newItem.originalPrice
       } else {
+        const unitPrice = newItem.price ?? newItem.giaBan ?? 199000
+        const origPrice = newItem.originalPrice ?? newItem.giaBanDau ?? newItem.giaGoc ?? unitPrice
         this.items.push({
           variantId: vId,
           id: newItem.id || vId,
           name: newItem.name || newItem.tenSanPham || 'Sản phẩm',
-          price: newItem.price || newItem.giaBan || 199000,
+          price: unitPrice,
+          originalPrice: origPrice,
           image: newItem.image || newItem.hinhAnhMain || newItem.hinhAnh || '',
           color: newItem.color || newItem.tenMauSac || 'Mặc định',
           size: newItem.size || newItem.tenKichCo || 'Mặc định',
@@ -105,15 +110,31 @@ export const useCartStore = defineStore('cart', {
           try {
             const res = await apiInstance.get(`/api/v1/chi-tiet-san-pham/${vId}`)
             if (res && res.data) {
-              const latestPrice = res.data.giaBan ?? res.data.donGia ?? item.price
-              const latestOriginalPrice = res.data.giaBanDau ?? res.data.giaGoc ?? latestPrice
-              const latestStock = res.data.soLuong ?? item.stock
+              const d = res.data
+              const rawPrice = d.giaBan ?? d.donGia ?? item.originalPrice ?? item.price
+              const latestStock = d.soLuongTon ?? d.soLuong ?? item.stock
+
+              const now = new Date()
+              let hasDiscount = false
+              if (d.trangThaiDotGiamGia === 1 && (d.phanTramGiam ?? 0) > 0 && d.ngayBatDau && d.ngayKetThuc) {
+                const start = new Date(d.ngayBatDau)
+                const end = new Date(d.ngayKetThuc)
+                hasDiscount = now >= start && now <= end
+              }
+
+              const latestOriginalPrice = Number(rawPrice)
+              const latestPrice = hasDiscount
+                ? latestOriginalPrice * (100 - Number(d.phanTramGiam)) / 100
+                : latestOriginalPrice
 
               if (latestPrice !== undefined && Number(item.price) !== Number(latestPrice)) {
                 priceChanged = true
                 updatedItems[i].price = Number(latestPrice)
                 updatedItems[i].originalPrice = Number(latestOriginalPrice)
+              } else if (latestOriginalPrice !== undefined && Number(item.originalPrice) !== Number(latestOriginalPrice)) {
+                updatedItems[i].originalPrice = Number(latestOriginalPrice)
               }
+
               if (latestStock !== undefined) {
                 updatedItems[i].stock = latestStock
               }

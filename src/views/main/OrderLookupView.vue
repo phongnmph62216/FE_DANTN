@@ -54,6 +54,26 @@ const handleSearch = async () => {
     
     if (response.data) {
       order.value = response.data
+
+      // Enrich product list with original price (giaGoc) if missing or equal to donGia
+      const prods = order.value.danhSachSanPham || order.value.chiTietList || []
+      if (prods && prods.length > 0) {
+        await Promise.all(prods.map(async (item) => {
+          const vId = item.idChiTietSanPham || item.idChiTiet || item.chiTietSanPhamId
+          if (vId) {
+            try {
+              const vRes = await api.get(`/api/v1/chi-tiet-san-pham/${vId}`).catch(() => null)
+              if (vRes && vRes.data && vRes.data.giaBan) {
+                const origPrice = Number(vRes.data.giaBan)
+                const currentPrice = Number(item.donGiaSauGiam || item.donGia || item.price || 0)
+                if (origPrice > currentPrice) {
+                  item.giaGoc = origPrice
+                }
+              }
+            } catch (e) {}
+          }
+        }))
+      }
       
       // Update browser query parameters without reloading the page
       router.replace({
@@ -151,9 +171,12 @@ const getStatusText = (status) => {
 
 // Payment Status Check
 const isOrderPaid = (orderObj) => {
-  if (!orderObj || !orderObj.lichSuThanhToan || orderObj.lichSuThanhToan.length === 0) return false
+  if (!orderObj) return false
+  // Đơn hàng đã hoàn thành (trangThai === 4) hoặc có cờ đã thanh toán
+  if (orderObj.trangThai === 4 || orderObj.trangThaiThanhToan === 1 || orderObj.trangThaiThanhToan === '1' || orderObj.daThanhToan) return true
+  if (!orderObj.lichSuThanhToan || orderObj.lichSuThanhToan.length === 0) return false
   const totalPaid = orderObj.lichSuThanhToan.reduce((sum, pay) => sum + (pay.soTien || 0), 0)
-  return totalPaid >= orderObj.tongTien
+  return totalPaid >= (orderObj.tongTien || 0)
 }
 
 // Order type helper
@@ -412,11 +435,19 @@ const steps = [
                 <div class="flex-1 flex flex-col justify-between">
                   <div>
                     <h5 class="text-sm font-bold text-on-surface line-clamp-2">{{ item.tenSanPham }}</h5>
-                    <p class="text-xs text-on-surface-variant mt-1">Phân loại: {{ item.tenMauSac }}, {{ item.tenKichCo }}</p>
+                    <p class="text-xs text-on-surface-variant mt-1">
+                      <span v-if="item.maChiTietSanPham || item.maSanPham" class="font-mono text-on-surface-variant mr-2">Mã: {{ item.maChiTietSanPham || item.maSanPham }}</span>
+                      <span>Phân loại: <strong class="font-semibold text-on-surface">{{ item.tenMauSac }}, {{ item.tenKichCo }}</strong></span>
+                    </p>
                   </div>
                   <div class="flex justify-between items-center mt-2">
                     <span class="text-xs text-on-surface-variant">Số lượng: <span class="font-bold text-on-surface">{{ item.soLuong }}</span></span>
-                    <span class="text-sm font-bold text-[#ef972d]">{{ formatCurrency(item.donGia) }}</span>
+                    <div class="text-right">
+                      <div v-if="(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) && Number(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) > Number(item.donGiaSauGiam || item.donGia)" class="text-xs text-gray-400 line-through font-normal">
+                        {{ formatCurrency(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) }}
+                      </div>
+                      <div class="text-sm font-bold text-[#ef972d]">{{ formatCurrency(item.donGiaSauGiam || item.donGia) }}</div>
+                    </div>
                   </div>
                 </div>
               </div>

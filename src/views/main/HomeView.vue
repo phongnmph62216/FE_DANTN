@@ -46,7 +46,7 @@ const getStatusBadgeClass = (status) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 0: return 'Chờ xác nhận'
-    case 1: return 'Đang xử lý'
+    case 1: return 'Đã xác nhận'
     case 2: return 'Chờ giao'
     case 3: return 'Đang giao'
     case 4: return 'Hoàn thành'

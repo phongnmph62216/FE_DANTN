@@ -29,7 +29,7 @@ const activeTab = ref('all')
 const tabs = [
   { id: 'all', label: 'Tất cả' },
   { id: '0', label: 'Chờ xác nhận' },
-  { id: '1', label: 'Đang xử lý' },
+  { id: '1', label: 'Đã xác nhận' },
   { id: '2', label: 'Chờ giao' },
   { id: '3', label: 'Đang giao' },
   { id: '4', label: 'Hoàn thành' },
@@ -57,10 +57,32 @@ const fetchOrders = async () => {
 
     const response = await api.get('/api/v1/hoa-don/khach-hang')
     orders.value = response.data || []
-    
+
+    // Enrich product list with original price (giaGoc) if missing or equal to donGia
+    if (orders.value && orders.value.length > 0) {
+      for (const ord of orders.value) {
+        if (ord.danhSachSanPham && ord.danhSachSanPham.length > 0) {
+          await Promise.all(ord.danhSachSanPham.map(async (item) => {
+            const vId = item.idChiTietSanPham || item.idChiTiet || item.chiTietSanPhamId
+            if (vId) {
+              try {
+                const vRes = await api.get(`/api/v1/chi-tiet-san-pham/${vId}`).catch(() => null)
+                if (vRes && vRes.data && vRes.data.giaBan) {
+                  const origPrice = Number(vRes.data.giaBan)
+                  const currentPrice = Number(item.donGiaSauGiam || item.donGia || item.price || 0)
+                  if (origPrice > currentPrice) {
+                    item.giaGoc = origPrice
+                  }
+                }
+              } catch (e) {}
+            }
+          }))
+        }
+      }
+    }
+
     // Auto-select first order if exists and not already selected
     if (orders.value.length > 0) {
-      // Find previously selected order if any, otherwise first
       if (selectedOrder.value) {
         const found = orders.value.find(o => o.id === selectedOrder.value.id)
         selectedOrder.value = found || orders.value[0]
@@ -102,7 +124,7 @@ const formatDate = (dateStr) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 0: return 'Chờ xác nhận'
-    case 1: return 'Đang xử lý' // Đã xác nhận
+    case 1: return 'Đã xác nhận'
     case 2: return 'Chờ giao'
     case 3: return 'Đang giao'
     case 4: return 'Hoàn thành'
@@ -171,10 +193,12 @@ const getPaymentMethodLabel = (order) => {
 
 // Payment Status Check
 const isOrderPaid = (order) => {
-  if (!order || !order.lichSuThanhToan || order.lichSuThanhToan.length === 0) return false
-  // Sum up payment values
+  if (!order) return false
+  // Đơn hàng đã hoàn thành (trangThai === 4) hoặc có cờ đã thanh toán
+  if (order.trangThai === 4 || order.trangThaiThanhToan === 1 || order.trangThaiThanhToan === '1' || order.daThanhToan) return true
+  if (!order.lichSuThanhToan || order.lichSuThanhToan.length === 0) return false
   const totalPaid = order.lichSuThanhToan.reduce((sum, pay) => sum + (pay.soTien || 0), 0)
-  return totalPaid >= order.tongTien
+  return totalPaid >= (order.tongTien || 0)
 }
 
 // Selection Helper
@@ -326,7 +350,7 @@ onMounted(() => {
       <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- Left Column: List of Orders (Span 5) -->
-        <div class="lg:col-span-5 flex flex-col gap-4 max-h-[820px] overflow-y-auto pr-1 no-scrollbar">
+        <div class="lg:col-span-5 flex flex-col gap-4 max-h-[820px] overflow-y-auto pr-2 custom-scrollbar">
           <div 
             v-for="order in filteredOrders" 
             :key="order.id"
@@ -494,11 +518,15 @@ onMounted(() => {
                         {{ item.tenSanPham }}
                       </h5>
                       <div class="text-[11px] text-gray-500 flex flex-wrap gap-x-3">
+                        <span v-if="item.maChiTietSanPham || item.maSanPham">Mã: <strong class="font-mono text-gray-800">{{ item.maChiTietSanPham || item.maSanPham }}</strong></span>
                         <span>Phân loại: <strong class="text-gray-800">{{ item.tenMauSac }}, Size {{ item.tenKichCo }}</strong></span>
                         <span>Số lượng: <strong class="text-gray-800">{{ item.soLuong }}</strong></span>
                       </div>
-                      <div class="text-xs font-extrabold text-[#EF972D] pt-0.5">
-                        {{ formatCurrency(item.donGiaSauGiam || item.donGia) }}
+                      <div class="text-xs font-extrabold text-[#EF972D] pt-0.5 flex flex-col items-start gap-0.5">
+                        <span v-if="(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) && Number(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) > Number(item.donGiaSauGiam || item.donGia)" class="line-through text-xs text-gray-400 font-normal">
+                          {{ formatCurrency(item.giaGoc || item.giaBanDau || item.originalPrice || item.giaBan) }}
+                        </span>
+                        <span>{{ formatCurrency(item.donGiaSauGiam || item.donGia) }}</span>
                       </div>
                     </div>
                   </div>
